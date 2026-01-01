@@ -1,0 +1,155 @@
+
+> hexa-vector-postgres@1.0.0 ingest
+> tsx src/ingest.ts
+
+Checking Ollama...
+
+Scanning sources...
+Scanning hexactitude-docs...
+  Found 1201 files
+Scanning hexactitude-scripts...
+  Found 91 files
+Scanning hexactitude-plugins...
+  Found 65 files
+Scanning ahs-documentation...
+  Found 42 files
+Scanning front...
+  Found 530 files
+Scanning bff...
+  Found 282 files
+Scanning contracts...
+  Found 86 files
+Found 2297 files to process
+[1/2297] 0.0% | 0s elapsed | 0 chunks | ETA: 0s | hexactitude-docs
+[21/2297] 0.9% | 4s elapsed | 74 chunks | ETA: 399s | hexactitude-docs
+[41/2297] 1.7% | 6s elapsed | 145 chunks | ETA: 357s | hexactitude-docs
+[61/2297] 2.6% | 9s elapsed | 221 chunks | ETA: 336s | hexactitude-docs
+[81/2297] 3.5% | 12s elapsed | 315 chunks | ETA: 369s | hexactitude-docs
+[101/2297] 4.4% | 18s elapsed | 449 chunks | ETA: 409s | hexactitude-docs
+[121/2297] 5.2% | 21s elapsed | 524 chunks | ETA: 389s | hexactitude-docs
+[141/2297] 6.1% | 24s elapsed | 603 chunks | ETA: 387s | hexactitude-docs
+[161/2297] 7.0% | 27s elapsed | 678 chunks | ETA: 380s | hexactitude-docs
+[181/2297] 7.8% | 29s elapsed | 749 chunks | ETA: 370s | hexactitude-docs
+[201/2297] 8.7% | 34s elapsed | 864 chunks | ETA: 381s | hexactitude-docs
+[221/2297] 9.6% | 38s elapsed | 975 chunks | ETA: 386s | hexactitude-docs
+[241/2297] 10.4% | 42s elapsed | 1061 chunks | ETA: 382s | hexactitude-docs
+[261/2297] 11.3% | 45s elapsed | 1136 chunks | ETA: 376s | hexactitude-docs
+[281/2297] 12.2% | 51s elapsed | 1248 chunks | ETA: 384s | hexactitude-docs
+[301/2297] 13.1% | 54s elapsed | 1318 chunks | ETA: 375s | hexactitude-docs
+[321/2297] 13.9% | 57s elapsed | 1399 chunks | ETA: 371s | hexactitude-docs
+[341/2297] 14.8% | 60s elapsed | 1476 chunks | ETA: 367s | hexactitude-docs
+[361/2297] 15.7% | 63s elapsed | 1534 chunks | ETA: 355s | hexactitude-docs
+[381/2297] 16.5% | 64s elapsed | 1562 chunks | ETA: 345s | hexactitude-docs
+[401/2297] 17.4% | 66s elapsed | 1622 chunks | ETA: 339s | hexactitude-docs
+[421/2297] 18.3% | 68s elapsed | 1682 chunks | ETA: 328s | hexactitude-docs
+[441/2297] 19.2% | 69s elapsed | 1716 chunks | ETA: 321s | hexactitude-docs
+[461/2297] 20.0% | 72s elapsed | 1794 chunks | ETA: 316s | hexactitude-docs
+[481/2297] 20.9% | 74s elapsed | 1849 chunks | ETA: 310s | hexactitude-docs
+[501/2297] 21.8% | 79s elapsed | 1945 chunks | ETA: 309s | hexactitude-docs
+[521/2297] 22.6% | 81s elapsed | 2018 chunks | ETA: 303s | hexactitude-docs
+[541/2297] 23.5% | 83s elapsed | 2066 chunks | ETA: 296s | hexactitude-docs
+[561/2297] 24.4% | 86s elapsed | 2136 chunks | ETA: 291s | hexactitude-docs
+[581/2297] 25.3% | 90s elapsed | 2230 chunks | ETA: 291s | hexactitude-docs
+[601/2297] 26.1% | 94s elapsed | 2307 chunks | ETA: 287s | hexactitude-docs
+[621/2297] 27.0% | 99s elapsed | 2432 chunks | ETA: 289s | hexactitude-docs
+[641/2297] 27.9% | 103s elapsed | 2536 chunks | ETA: 289s | hexactitude-docs
+[661/2297] 28.7% | 107s elapsed | 2606 chunks | ETA: 288s | hexactitude-docs
+[681/2297] 29.6% | 110s elapsed | 2683 chunks | ETA: 283s | hexactitude-docs
+[701/2297] 30.5% | 111s elapsed | 2721 chunks | ETA: 276s | hexactitude-docs
+[721/2297] 31.3% | 114s elapsed | 2781 chunks | ETA: 273s | hexactitude-docs
+[741/2297] 32.2% | 116s elapsed | 2850 chunks | ETA: 267s | hexactitude-docs
+[761/2297] 33.1% | 120s elapsed | 2933 chunks | ETA: 264s | hexactitude-docs
+[781/2297] 34.0% | 123s elapsed | 3015 chunks | ETA: 261s | hexactitude-docs
+[801/2297] 34.8% | 125s elapsed | 3070 chunks | ETA: 255s | hexactitude-docs
+[821/2297] 35.7% | 127s elapsed | 3136 chunks | ETA: 252s | hexactitude-docs
+[841/2297] 36.6% | 130s elapsed | 3220 chunks | ETA: 248s | hexactitude-docs
+[861/2297] 37.4% | 133s elapsed | 3291 chunks | ETA: 244s | hexactitude-docs
+[881/2297] 38.3% | 135s elapsed | 3336 chunks | ETA: 238s | hexactitude-docs
+[901/2297] 39.2% | 139s elapsed | 3417 chunks | ETA: 235s | hexactitude-docs
+[921/2297] 40.1% | 142s elapsed | 3503 chunks | ETA: 232s | hexactitude-docs
+[941/2297] 40.9% | 146s elapsed | 3586 chunks | ETA: 229s | hexactitude-docs
+[961/2297] 41.8% | 149s elapsed | 3681 chunks | ETA: 226s | hexactitude-docs
+[981/2297] 42.7% | 153s elapsed | 3784 chunks | ETA: 224s | hexactitude-docs
+[1001/2297] 43.5% | 157s elapsed | 3876 chunks | ETA: 221s | hexactitude-docs
+[1021/2297] 44.4% | 162s elapsed | 3978 chunks | ETA: 219s | hexactitude-docs
+[1041/2297] 45.3% | 164s elapsed | 4034 chunks | ETA: 215s | hexactitude-docs
+[1061/2297] 46.1% | 166s elapsed | 4088 chunks | ETA: 209s | hexactitude-docs
+[1081/2297] 47.0% | 169s elapsed | 4156 chunks | ETA: 206s | hexactitude-docs
+[1101/2297] 47.9% | 175s elapsed | 4285 chunks | ETA: 205s | hexactitude-docs
+[1121/2297] 48.8% | 178s elapsed | 4362 chunks | ETA: 202s | hexactitude-docs
+[1141/2297] 49.6% | 180s elapsed | 4398 chunks | ETA: 196s | hexactitude-docs
+[1161/2297] 50.5% | 182s elapsed | 4449 chunks | ETA: 191s | hexactitude-docs
+[1181/2297] 51.4% | 187s elapsed | 4554 chunks | ETA: 189s | hexactitude-docs
+[1201/2297] 52.2% | 188s elapsed | 4583 chunks | ETA: 184s | hexactitude-docs
+[1221/2297] 53.1% | 190s elapsed | 4631 chunks | ETA: 179s | hexactitude-scripts
+[1241/2297] 54.0% | 194s elapsed | 4720 chunks | ETA: 177s | hexactitude-scripts
+[1261/2297] 54.9% | 198s elapsed | 4814 chunks | ETA: 174s | hexactitude-scripts
+[1281/2297] 55.7% | 201s elapsed | 4878 chunks | ETA: 170s | hexactitude-scripts
+[1301/2297] 56.6% | 204s elapsed | 4948 chunks | ETA: 166s | hexactitude-plugins
+[1321/2297] 57.5% | 206s elapsed | 5016 chunks | ETA: 163s | hexactitude-plugins
+[1341/2297] 58.3% | 210s elapsed | 5108 chunks | ETA: 159s | hexactitude-plugins
+[1361/2297] 59.2% | 214s elapsed | 5221 chunks | ETA: 157s | ahs-documentation
+[1381/2297] 60.1% | 216s elapsed | 5275 chunks | ETA: 153s | ahs-documentation
+[1401/2297] 60.9% | 219s elapsed | 5336 chunks | ETA: 148s | front
+[1421/2297] 61.8% | 220s elapsed | 5367 chunks | ETA: 144s | front
+[1441/2297] 62.7% | 221s elapsed | 5400 chunks | ETA: 139s | front
+[1461/2297] 63.6% | 222s elapsed | 5433 chunks | ETA: 134s | front
+[1481/2297] 64.4% | 223s elapsed | 5464 chunks | ETA: 130s | front
+[1501/2297] 65.3% | 224s elapsed | 5500 chunks | ETA: 126s | front
+[1521/2297] 66.2% | 224s elapsed | 5530 chunks | ETA: 121s | front
+[1541/2297] 67.0% | 225s elapsed | 5559 chunks | ETA: 117s | front
+[1561/2297] 67.9% | 226s elapsed | 5585 chunks | ETA: 113s | front
+[1581/2297] 68.8% | 227s elapsed | 5608 chunks | ETA: 108s | front
+[1601/2297] 69.7% | 227s elapsed | 5636 chunks | ETA: 104s | front
+[1621/2297] 70.5% | 228s elapsed | 5659 chunks | ETA: 100s | front
+[1641/2297] 71.4% | 229s elapsed | 5685 chunks | ETA: 96s | front
+[1661/2297] 72.3% | 229s elapsed | 5711 chunks | ETA: 92s | front
+[1681/2297] 73.1% | 230s elapsed | 5732 chunks | ETA: 89s | front
+[1701/2297] 74.0% | 230s elapsed | 5753 chunks | ETA: 85s | front
+[1721/2297] 74.9% | 231s elapsed | 5779 chunks | ETA: 81s | front
+[1741/2297] 75.8% | 233s elapsed | 5820 chunks | ETA: 78s | front
+[1761/2297] 76.6% | 234s elapsed | 5865 chunks | ETA: 75s | front
+[1781/2297] 77.5% | 236s elapsed | 5913 chunks | ETA: 72s | front
+[1801/2297] 78.4% | 237s elapsed | 5949 chunks | ETA: 69s | front
+[1821/2297] 79.2% | 239s elapsed | 6001 chunks | ETA: 66s | front
+[1841/2297] 80.1% | 240s elapsed | 6033 chunks | ETA: 62s | front
+[1861/2297] 81.0% | 242s elapsed | 6093 chunks | ETA: 60s | front
+[1881/2297] 81.8% | 244s elapsed | 6129 chunks | ETA: 56s | front
+[1901/2297] 82.7% | 245s elapsed | 6161 chunks | ETA: 53s | front
+[1921/2297] 83.6% | 246s elapsed | 6193 chunks | ETA: 50s | front
+[1941/2297] 84.5% | 248s elapsed | 6235 chunks | ETA: 48s | bff
+[1961/2297] 85.3% | 249s elapsed | 6270 chunks | ETA: 45s | bff
+[1981/2297] 86.2% | 249s elapsed | 6293 chunks | ETA: 42s | bff
+[2001/2297] 87.1% | 251s elapsed | 6329 chunks | ETA: 39s | bff
+[2021/2297] 87.9% | 251s elapsed | 6355 chunks | ETA: 36s | bff
+[2041/2297] 88.8% | 252s elapsed | 6387 chunks | ETA: 33s | bff
+[2061/2297] 89.7% | 253s elapsed | 6410 chunks | ETA: 30s | bff
+[2081/2297] 90.6% | 253s elapsed | 6443 chunks | ETA: 28s | bff
+[2101/2297] 91.4% | 254s elapsed | 6465 chunks | ETA: 25s | bff
+[2121/2297] 92.3% | 255s elapsed | 6491 chunks | ETA: 22s | bff
+[2141/2297] 93.2% | 256s elapsed | 6537 chunks | ETA: 20s | bff
+[2161/2297] 94.0% | 257s elapsed | 6572 chunks | ETA: 17s | bff
+[2181/2297] 94.9% | 258s elapsed | 6599 chunks | ETA: 14s | bff
+[2201/2297] 95.8% | 259s elapsed | 6623 chunks | ETA: 12s | bff
+[2221/2297] 96.6% | 261s elapsed | 6681 chunks | ETA: 9s | contracts
+[2241/2297] 97.5% | 263s elapsed | 6738 chunks | ETA: 7s | contracts
+[2261/2297] 98.4% | 264s elapsed | 6781 chunks | ETA: 4s | contracts
+[2281/2297] 99.3% | 266s elapsed | 6817 chunks | ETA: 2s | contracts
+[2297/2297] 100.0% | 266s elapsed | 6837 chunks | ETA: 0s | contracts
+
+✓ Done in 266.2s
+  Processed: 2216 files
+  Skipped: 0 files (unchanged)
+  Chunks created: 6838
+
+Database stats:
+  Total chunks: 6514
+  Total files: 2152
+  By type: {
+  code: 1332,
+  contract: 171,
+  glossary: 120,
+  knowledge: 4263,
+  plugin: 325,
+  script: 303
+}

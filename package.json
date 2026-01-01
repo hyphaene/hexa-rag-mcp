@@ -1,0 +1,26 @@
+{
+  "name": "hexa-vector-postgres",
+  "version": "1.0.0",
+  "description": "Local vector search for Hexactitude knowledge base",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "ingest": "tsx src/ingest.ts",
+    "search": "tsx src/search.ts"
+  },
+  "bin": {
+    "hexa-ingest": "./dist/ingest.js",
+    "hexa-search": "./dist/search.js"
+  },
+  "dependencies": {
+    "glob": "^11.0.0",
+    "pg": "^8.13.0",
+    "pgvector": "^0.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
