@@ -22,6 +22,7 @@ export interface StoredChunk {
 }
 /**
  * Insert a chunk with its embedding.
+ * Also generates tsvector for full-text search.
  */
 export declare function insertChunk(chunk: Chunk, embedding: number[]): Promise<void>;
 /**
@@ -40,6 +41,19 @@ export declare function deleteChunksForFile(filePath: string): Promise<void>;
  */
 export declare function searchSimilar(embedding: number[], limit?: number, sourceType?: string): Promise<Array<StoredChunk & {
     similarity: number;
+}>>;
+/**
+ * Hybrid search combining vector similarity and BM25 full-text search.
+ * Uses Reciprocal Rank Fusion (RRF) to combine scores.
+ * @param embedding - Query embedding vector
+ * @param query - Original query text for BM25
+ * @param limit - Number of results to return
+ * @param alpha - Weight for vector search (0-1), BM25 weight = 1-alpha
+ */
+export declare function searchHybrid(embedding: number[], query: string, limit?: number, alpha?: number): Promise<Array<StoredChunk & {
+    similarity: number;
+    bm25_rank: number;
+    hybrid_score: number;
 }>>;
 /**
  * Get sync state for a file.

@@ -61,6 +61,7 @@ export async function ensureTable(): Promise<void> {
       chunk_index INTEGER NOT NULL,
       content TEXT NOT NULL,
       embedding vector(${dim}),
+      tsv tsvector,
       created_at TIMESTAMP DEFAULT NOW(),
       UNIQUE(source_path, chunk_index)
     )
@@ -74,6 +75,11 @@ export async function ensureTable(): Promise<void> {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS ${table}_source_type_idx
     ON ${table} (source_type)
+  `);
+  // GIN index for full-text search
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS ${table}_tsv_idx
+    ON ${table} USING gin (tsv)
   `);
 }
 
@@ -96,6 +102,7 @@ export interface StoredChunk {
 
 /**
  * Insert a chunk with its embedding.
+ * Also generates tsvector for full-text search.
  */
 export async function insertChunk(
   chunk: Chunk,
@@ -105,10 +112,10 @@ export async function insertChunk(
   const table = getTableName();
 
   await pool.query(
-    `INSERT INTO ${table} (source_path, source_name, source_type, chunk_index, content, embedding)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO ${table} (source_path, source_name, source_type, chunk_index, content, embedding, tsv)
+     VALUES ($1, $2, $3, $4, $5, $6, to_tsvector('english', $5))
      ON CONFLICT (source_path, chunk_index)
-     DO UPDATE SET content = $5, embedding = $6, created_at = NOW()`,
+     DO UPDATE SET content = $5, embedding = $6, tsv = to_tsvector('english', $5), created_at = NOW()`,
     [
       chunk.file.absolutePath,
       chunk.file.sourceName,
@@ -192,6 +199,80 @@ export async function searchSimilar(
      ORDER BY embedding <=> $1
      LIMIT $2`,
     params,
+  );
+
+  return result.rows;
+}
+
+/**
+ * Hybrid search combining vector similarity and BM25 full-text search.
+ * Uses Reciprocal Rank Fusion (RRF) to combine scores.
+ * @param embedding - Query embedding vector
+ * @param query - Original query text for BM25
+ * @param limit - Number of results to return
+ * @param alpha - Weight for vector search (0-1), BM25 weight = 1-alpha
+ */
+export async function searchHybrid(
+  embedding: number[],
+  query: string,
+  limit: number = 10,
+  alpha: number = 0.7,
+): Promise<
+  Array<
+    StoredChunk & {
+      similarity: number;
+      bm25_rank: number;
+      hybrid_score: number;
+    }
+  >
+> {
+  const pool = await getPool();
+  const table = getTableName();
+  const k = 60; // RRF constant
+
+  // Use Reciprocal Rank Fusion to combine vector and BM25 rankings
+  // RRF(d) = Σ 1/(k + rank(d)) for each ranking
+  const result = await pool.query<
+    StoredChunk & {
+      similarity: number;
+      bm25_rank: number;
+      hybrid_score: number;
+    }
+  >(
+    `WITH vector_search AS (
+      SELECT id, 1 - (embedding <=> $1) as similarity,
+             ROW_NUMBER() OVER (ORDER BY embedding <=> $1) as vec_rank
+      FROM ${table}
+      WHERE embedding IS NOT NULL
+      ORDER BY embedding <=> $1
+      LIMIT 100
+    ),
+    bm25_search AS (
+      SELECT id, ts_rank_cd(tsv, plainto_tsquery('english', $2)) as bm25_score,
+             ROW_NUMBER() OVER (ORDER BY ts_rank_cd(tsv, plainto_tsquery('english', $2)) DESC) as bm25_rank
+      FROM ${table}
+      WHERE tsv @@ plainto_tsquery('english', $2)
+      ORDER BY bm25_score DESC
+      LIMIT 100
+    ),
+    combined AS (
+      SELECT
+        COALESCE(v.id, b.id) as id,
+        COALESCE(v.similarity, 0) as similarity,
+        COALESCE(b.bm25_rank, 100) as bm25_rank,
+        -- RRF score: weighted combination of reciprocal ranks
+        $4 * (1.0 / ($5 + COALESCE(v.vec_rank, 100))) +
+        (1 - $4) * (1.0 / ($5 + COALESCE(b.bm25_rank, 100))) as hybrid_score
+      FROM vector_search v
+      FULL OUTER JOIN bm25_search b ON v.id = b.id
+    )
+    SELECT c.id, c.source_path, c.source_name, c.source_type, c.chunk_index,
+           c.content, c.created_at, combined.similarity, combined.bm25_rank, combined.hybrid_score
+    FROM combined
+    JOIN ${table} c ON c.id = combined.id
+    ORDER BY combined.hybrid_score DESC
+    LIMIT $3`,
+    [pgvector.toSql(embedding), query, limit, alpha, k],
   );
 
   return result.rows;

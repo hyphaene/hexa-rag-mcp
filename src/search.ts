@@ -2,6 +2,7 @@
 import { getEmbedding, checkOllama, setModel, getModel } from "./embedder.js";
 import {
   searchSimilar,
+  searchHybrid,
   getStats,
   closePool,
   setDbModel,
@@ -16,6 +17,8 @@ interface SearchOptions {
   type?: string;
   verbose?: boolean;
   model?: string;
+  hybrid?: boolean;
+  alpha?: number;
 }
 
 function formatPath(path: string): string {
@@ -44,7 +47,15 @@ function highlightMatch(content: string, maxLength: number = 200): string {
 }
 
 export async function search(options: SearchOptions): Promise<void> {
-  const { query, limit = 10, type, verbose = false, model } = options;
+  const {
+    query,
+    limit = 10,
+    type,
+    verbose = false,
+    model,
+    hybrid = false,
+    alpha = 0.7,
+  } = options;
 
   if (!query.trim()) {
     console.error("Please provide a search query");
@@ -69,8 +80,9 @@ export async function search(options: SearchOptions): Promise<void> {
   }
 
   const currentModel = getModel();
+  const searchMode = hybrid ? `hybrid (α=${alpha})` : "vector";
   console.log(
-    `Searching for: "${query}"${type ? ` (type: ${type})` : ""} [model: ${currentModel.name}]\n`,
+    `Searching for: "${query}"${type ? ` (type: ${type})` : ""} [model: ${currentModel.name}, mode: ${searchMode}]\n`,
   );
 
   // Get embedding for query
@@ -80,7 +92,9 @@ export async function search(options: SearchOptions): Promise<void> {
 
   // Search
   const searchStart = Date.now();
-  const results = await searchSimilar(embedding, limit, type);
+  const results = hybrid
+    ? await searchHybrid(embedding, query, limit, alpha)
+    : await searchSimilar(embedding, limit, type);
   const searchTime = Date.now() - searchStart;
 
   if (results.length === 0) {
@@ -93,10 +107,19 @@ export async function search(options: SearchOptions): Promise<void> {
 
   for (let i = 0; i < results.length; i++) {
     const r = results[i];
-    const sim = formatPercentage(r.similarity);
     const path = formatPath(r.source_path);
 
-    console.log(`${i + 1}. [${sim}] ${r.source_name}/${r.source_type}`);
+    if (hybrid && "hybrid_score" in r) {
+      const hr = r as typeof r & { hybrid_score: number; bm25_rank: number };
+      const score = (hr.hybrid_score * 1000).toFixed(1);
+      const sim = formatPercentage(hr.similarity);
+      console.log(
+        `${i + 1}. [rrf:${score}] ${hr.source_name}/${hr.source_type} (vec:${sim}, bm25:#${hr.bm25_rank})`,
+      );
+    } else {
+      const sim = formatPercentage(r.similarity);
+      console.log(`${i + 1}. [${sim}] ${r.source_name}/${r.source_type}`);
+    }
     console.log(`   ${path}`);
 
     if (verbose) {
@@ -158,6 +181,10 @@ function parseArgs(): SearchOptions & { showStats?: boolean } {
         process.exit(1);
       }
       options.model = modelName;
+    } else if (arg === "--hybrid" || arg === "-H") {
+      options.hybrid = true;
+    } else if (arg === "--alpha" || arg === "-a") {
+      options.alpha = parseFloat(args[++i]);
     } else if (arg === "--stats") {
       options.showStats = true;
     } else if (arg === "--help" || arg === "-h") {
@@ -170,14 +197,17 @@ Options:
   -l, --limit N     Number of results (default: 10)
   -t, --type TYPE   Filter by source type (knowledge, code, script, etc.)
   -m, --model NAME  Embedding model to use (${modelNames.join(", ")})
+  -H, --hybrid      Use hybrid search (vector + BM25)
+  -a, --alpha N     Vector weight for hybrid (0-1, default: 0.7)
   -v, --verbose     Show more details and content preview
   --stats           Show database statistics
   -h, --help        Show this help
 
 Examples:
   hexa-search "comment fonctionne le chunking"
-  hexa-search "SX status" --type code -m e5
-  hexa-search "glossaire distribution" -l 5 -v
+  hexa-search "SX status" --type code -m bge
+  hexa-search "SEE-12345" --hybrid           # hybrid for exact matches
+  hexa-search "glossaire" -H -a 0.5          # balanced hybrid
   hexa-search --stats
 `);
       process.exit(0);

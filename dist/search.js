@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { getEmbedding, checkOllama, setModel, getModel } from "./embedder.js";
-import { searchSimilar, getStats, closePool, setDbModel, } from "./db.js";
+import { searchSimilar, searchHybrid, getStats, closePool, setDbModel, } from "./db.js";
 import { EMBEDDING_MODELS } from "./config.js";
 function formatPath(path) {
     // Shorten home directory
@@ -23,7 +23,7 @@ function highlightMatch(content, maxLength = 200) {
     return preview;
 }
 export async function search(options) {
-    const { query, limit = 10, type, verbose = false, model } = options;
+    const { query, limit = 10, type, verbose = false, model, hybrid = false, alpha = 0.7, } = options;
     if (!query.trim()) {
         console.error("Please provide a search query");
         process.exit(1);
@@ -43,14 +43,17 @@ export async function search(options) {
         process.exit(1);
     }
     const currentModel = getModel();
-    console.log(`Searching for: "${query}"${type ? ` (type: ${type})` : ""} [model: ${currentModel.name}]\n`);
+    const searchMode = hybrid ? `hybrid (α=${alpha})` : "vector";
+    console.log(`Searching for: "${query}"${type ? ` (type: ${type})` : ""} [model: ${currentModel.name}, mode: ${searchMode}]\n`);
     // Get embedding for query
     const startTime = Date.now();
     const embedding = await getEmbedding(query);
     const embedTime = Date.now() - startTime;
     // Search
     const searchStart = Date.now();
-    const results = await searchSimilar(embedding, limit, type);
+    const results = hybrid
+        ? await searchHybrid(embedding, query, limit, alpha)
+        : await searchSimilar(embedding, limit, type);
     const searchTime = Date.now() - searchStart;
     if (results.length === 0) {
         console.log("No results found.");
@@ -60,9 +63,17 @@ export async function search(options) {
     console.log(`Found ${results.length} results:\n`);
     for (let i = 0; i < results.length; i++) {
         const r = results[i];
-        const sim = formatPercentage(r.similarity);
         const path = formatPath(r.source_path);
-        console.log(`${i + 1}. [${sim}] ${r.source_name}/${r.source_type}`);
+        if (hybrid && "hybrid_score" in r) {
+            const hr = r;
+            const score = (hr.hybrid_score * 1000).toFixed(1);
+            const sim = formatPercentage(hr.similarity);
+            console.log(`${i + 1}. [rrf:${score}] ${hr.source_name}/${hr.source_type} (vec:${sim}, bm25:#${hr.bm25_rank})`);
+        }
+        else {
+            const sim = formatPercentage(r.similarity);
+            console.log(`${i + 1}. [${sim}] ${r.source_name}/${r.source_type}`);
+        }
         console.log(`   ${path}`);
         if (verbose) {
             console.log(`   Chunk ${r.chunk_index + 1}`);
@@ -119,6 +130,12 @@ function parseArgs() {
             }
             options.model = modelName;
         }
+        else if (arg === "--hybrid" || arg === "-H") {
+            options.hybrid = true;
+        }
+        else if (arg === "--alpha" || arg === "-a") {
+            options.alpha = parseFloat(args[++i]);
+        }
         else if (arg === "--stats") {
             options.showStats = true;
         }
@@ -132,14 +149,17 @@ Options:
   -l, --limit N     Number of results (default: 10)
   -t, --type TYPE   Filter by source type (knowledge, code, script, etc.)
   -m, --model NAME  Embedding model to use (${modelNames.join(", ")})
+  -H, --hybrid      Use hybrid search (vector + BM25)
+  -a, --alpha N     Vector weight for hybrid (0-1, default: 0.7)
   -v, --verbose     Show more details and content preview
   --stats           Show database statistics
   -h, --help        Show this help
 
 Examples:
   hexa-search "comment fonctionne le chunking"
-  hexa-search "SX status" --type code -m e5
-  hexa-search "glossaire distribution" -l 5 -v
+  hexa-search "SX status" --type code -m bge
+  hexa-search "SEE-12345" --hybrid           # hybrid for exact matches
+  hexa-search "glossaire" -H -a 0.5          # balanced hybrid
   hexa-search --stats
 `);
             process.exit(0);
