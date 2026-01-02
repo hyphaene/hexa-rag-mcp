@@ -46,10 +46,11 @@ async function shouldProcessFile(
 async function processFile(
   file: ScannedFile,
   verbose: boolean,
+  maxTokens?: number,
 ): Promise<number> {
   try {
     // Chunk the file
-    const chunks = await chunkFile(file);
+    const chunks = await chunkFile(file, maxTokens);
     if (chunks.length === 0) {
       if (verbose) console.log(`  Skipping empty file: ${file.relativePath}`);
       return 0;
@@ -85,16 +86,19 @@ export async function ingest(options: IngestOptions = {}): Promise<void> {
   } = options;
 
   // Set model if specified
+  let modelConfig;
   if (model) {
-    const modelConfig = setModel(model);
+    modelConfig = setModel(model);
     setDbModel(modelConfig);
     console.log(
-      `Using model: ${modelConfig.name} (${modelConfig.ollamaModel}, ${modelConfig.dimensions}d)`,
+      `Using model: ${modelConfig.name} (${modelConfig.ollamaModel}, ${modelConfig.dimensions}d, ${modelConfig.maxTokens} max tokens)`,
     );
   } else {
-    const modelConfig = getModel();
+    modelConfig = getModel();
     setDbModel(modelConfig);
-    console.log(`Using default model: ${modelConfig.name}`);
+    console.log(
+      `Using default model: ${modelConfig.name} (${modelConfig.maxTokens} max tokens)`,
+    );
   }
 
   // Ensure table exists for this model
@@ -156,7 +160,7 @@ export async function ingest(options: IngestOptions = {}): Promise<void> {
       );
     }
 
-    const chunks = await processFile(file, verbose);
+    const chunks = await processFile(file, verbose, modelConfig.maxTokens);
     if (chunks > 0) {
       processed++;
       totalChunks += chunks;

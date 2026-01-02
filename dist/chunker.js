@@ -140,7 +140,9 @@ export function chunkContent(content, maxTokens = CHUNK_CONFIG.maxTokens, overla
             }
             case "code":
             case "contract": {
-                const astChunks = chunkByAST(content, file.absolutePath);
+                // Convert maxTokens to chars (~3.5 chars/token)
+                const maxChars = Math.floor(maxTokens * 3.5);
+                const astChunks = chunkByAST(content, file.absolutePath, maxChars);
                 if (astChunks) {
                     return astChunks;
                 }
@@ -211,15 +213,17 @@ export function chunkContent(content, maxTokens = CHUNK_CONFIG.maxTokens, overla
 }
 /**
  * Read and chunk a file.
+ * @param file - The file to chunk
+ * @param maxTokens - Optional max tokens per chunk (defaults to CHUNK_CONFIG.maxTokens)
  */
-export async function chunkFile(file) {
+export async function chunkFile(file, maxTokens) {
     try {
         const content = await readFile(file.absolutePath, "utf-8");
         // Skip empty files
         if (!content.trim()) {
             return [];
         }
-        const chunks = chunkContent(content, CHUNK_CONFIG.maxTokens, CHUNK_CONFIG.overlap, file);
+        const chunks = chunkContent(content, maxTokens ?? CHUNK_CONFIG.maxTokens, CHUNK_CONFIG.overlap, file);
         return chunks.map((c, i) => ({
             file,
             index: i,

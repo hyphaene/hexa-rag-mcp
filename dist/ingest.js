@@ -20,10 +20,10 @@ async function shouldProcessFile(file, incremental) {
     const hash = await computeFileHash(file.absolutePath);
     return hash !== syncState.file_hash;
 }
-async function processFile(file, verbose) {
+async function processFile(file, verbose, maxTokens) {
     try {
         // Chunk the file
-        const chunks = await chunkFile(file);
+        const chunks = await chunkFile(file, maxTokens);
         if (chunks.length === 0) {
             if (verbose)
                 console.log(`  Skipping empty file: ${file.relativePath}`);
@@ -49,15 +49,16 @@ async function processFile(file, verbose) {
 export async function ingest(options = {}) {
     const { sources, incremental = false, limit, verbose = false, model, } = options;
     // Set model if specified
+    let modelConfig;
     if (model) {
-        const modelConfig = setModel(model);
+        modelConfig = setModel(model);
         setDbModel(modelConfig);
-        console.log(`Using model: ${modelConfig.name} (${modelConfig.ollamaModel}, ${modelConfig.dimensions}d)`);
+        console.log(`Using model: ${modelConfig.name} (${modelConfig.ollamaModel}, ${modelConfig.dimensions}d, ${modelConfig.maxTokens} max tokens)`);
     }
     else {
-        const modelConfig = getModel();
+        modelConfig = getModel();
         setDbModel(modelConfig);
-        console.log(`Using default model: ${modelConfig.name}`);
+        console.log(`Using default model: ${modelConfig.name} (${modelConfig.maxTokens} max tokens)`);
     }
     // Ensure table exists for this model
     await ensureTable();
@@ -101,7 +102,7 @@ export async function ingest(options = {}) {
         else if (i % 20 === 0 || i === files.length - 1) {
             console.log(`${progress} ${pct}% | ${elapsed}s elapsed | ${totalChunks} chunks | ETA: ${eta}s | ${file.sourceName}`);
         }
-        const chunks = await processFile(file, verbose);
+        const chunks = await processFile(file, verbose, modelConfig.maxTokens);
         if (chunks > 0) {
             processed++;
             totalChunks += chunks;

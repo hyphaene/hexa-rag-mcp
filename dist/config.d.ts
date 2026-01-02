@@ -17,6 +17,7 @@ export interface EmbeddingModel {
     ollamaModel: string;
     dimensions: number;
     multilingual: boolean;
+    maxTokens: number;
 }
 export declare const EMBEDDING_MODELS: Record<string, EmbeddingModel>;
 export declare const OLLAMA_CONFIG: {

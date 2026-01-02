@@ -101,6 +101,7 @@ export interface EmbeddingModel {
   ollamaModel: string;
   dimensions: number;
   multilingual: boolean;
+  maxTokens: number; // Max tokens per chunk for this model
 }
 
 export const EMBEDDING_MODELS: Record<string, EmbeddingModel> = {
@@ -109,12 +110,21 @@ export const EMBEDDING_MODELS: Record<string, EmbeddingModel> = {
     ollamaModel: "nomic-embed-text",
     dimensions: 768,
     multilingual: false,
+    maxTokens: 500, // nomic supports 8192 context
   },
   e5: {
     name: "e5",
     ollamaModel: "jeffh/intfloat-multilingual-e5-large:f16",
     dimensions: 1024,
     multilingual: true,
+    maxTokens: 300, // e5 has 512 context limit - aggressive margin
+  },
+  bge: {
+    name: "bge",
+    ollamaModel: "bge-m3",
+    dimensions: 1024,
+    multilingual: true,
+    maxTokens: 800, // bge-m3 supports 8192 context - larger chunks for better context
   },
 };
 

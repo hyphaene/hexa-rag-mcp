@@ -13,5 +13,7 @@ export interface Chunk {
 export declare function chunkContent(content: string, maxTokens?: number, overlap?: number, file?: ScannedFile): string[];
 /**
  * Read and chunk a file.
+ * @param file - The file to chunk
+ * @param maxTokens - Optional max tokens per chunk (defaults to CHUNK_CONFIG.maxTokens)
  */
-export declare function chunkFile(file: ScannedFile): Promise<Chunk[]>;
+export declare function chunkFile(file: ScannedFile, maxTokens?: number): Promise<Chunk[]>;
