@@ -1,12 +1,138 @@
 import { readFile } from "fs/promises";
 import { CHUNK_CONFIG } from "./config.js";
 import type { ScannedFile } from "./scanner.js";
+import { chunkByAST } from "./ast-chunker.js";
 
 export interface Chunk {
   file: ScannedFile;
   index: number;
   content: string;
   tokenCount: number;
+}
+
+/**
+ * Chunk glossary files by extracting individual term definitions.
+ * Pattern: **TERM**: definition or **TERM (ACRO)**: definition
+ * Falls back to default chunking if no terms found.
+ */
+function chunkGlossary(content: string): string[] | null {
+  // Pattern to match glossary entries: **Term**: definition
+  // Captures until next **Term**: or section header ## or end
+  const termPattern =
+    /^\*\*([^*]+)\*\*[:\s]*([\s\S]*?)(?=\n\*\*[^*]+\*\*[:\s]|\n#{1,6}\s|$)/gm;
+
+  const chunks: string[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = termPattern.exec(content)) !== null) {
+    const term = match[1].trim();
+    const definition = match[2].trim();
+
+    if (term && definition) {
+      // Reconstruct as a self-contained chunk
+      chunks.push(`**${term}**: ${definition}`);
+    }
+  }
+
+  // Return null to signal fallback if no terms found
+  if (chunks.length === 0) {
+    return null;
+  }
+
+  return chunks;
+}
+
+/**
+ * Chunk markdown content by sections (headers).
+ * Each section becomes a chunk, subdivided if too large.
+ * Falls back if no sections found.
+ */
+function chunkByMarkdownSections(
+  content: string,
+  maxTokens: number,
+): string[] | null {
+  // Split on headers (h1, h2, h3)
+  const sectionPattern = /^(#{1,3}\s+.+)$/gm;
+
+  // Find all header positions
+  const headers: Array<{ match: string; index: number }> = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = sectionPattern.exec(content)) !== null) {
+    headers.push({ match: match[0], index: match.index });
+  }
+
+  // No headers found = fallback
+  if (headers.length === 0) {
+    return null;
+  }
+
+  const chunks: string[] = [];
+
+  // Extract sections: header + content until next header
+  for (let i = 0; i < headers.length; i++) {
+    const start = headers[i].index;
+    const end = i < headers.length - 1 ? headers[i + 1].index : content.length;
+    const sectionContent = content.slice(start, end).trim();
+
+    // Check if section exceeds maxTokens
+    const tokens = estimateTokens(sectionContent);
+    if (tokens <= maxTokens) {
+      chunks.push(sectionContent);
+    } else {
+      // Subdivide large sections by paragraphs
+      const subChunks = subdivideSection(
+        sectionContent,
+        maxTokens,
+        headers[i].match,
+      );
+      chunks.push(...subChunks);
+    }
+  }
+
+  // Include any content before the first header
+  if (headers.length > 0 && headers[0].index > 0) {
+    const preamble = content.slice(0, headers[0].index).trim();
+    if (preamble) {
+      chunks.unshift(preamble);
+    }
+  }
+
+  return chunks.length > 0 ? chunks : null;
+}
+
+/**
+ * Subdivide a large section into smaller chunks, preserving the header.
+ */
+function subdivideSection(
+  section: string,
+  maxTokens: number,
+  header: string,
+): string[] {
+  const lines = section.split("\n");
+  const chunks: string[] = [];
+  let currentChunk: string[] = [header]; // Always start with the header
+  let currentTokens = estimateTokens(header);
+
+  for (const line of lines.slice(1)) {
+    // Skip the header line (already added)
+    const lineTokens = estimateTokens(line);
+
+    if (currentTokens + lineTokens > maxTokens && currentChunk.length > 1) {
+      chunks.push(currentChunk.join("\n"));
+      currentChunk = [header]; // New chunk starts with header for context
+      currentTokens = estimateTokens(header);
+    }
+
+    currentChunk.push(line);
+    currentTokens += lineTokens;
+  }
+
+  if (currentChunk.length > 1) {
+    chunks.push(currentChunk.join("\n"));
+  }
+
+  return chunks;
 }
 
 /**
@@ -32,12 +158,47 @@ function splitIntoSegments(text: string): string[] {
 /**
  * Chunk a file's content into segments of ~maxTokens.
  * Uses overlap to maintain context between chunks.
+ * If file is provided, uses type-specific chunking strategies.
  */
 export function chunkContent(
   content: string,
   maxTokens: number = CHUNK_CONFIG.maxTokens,
   overlap: number = CHUNK_CONFIG.overlap,
+  file?: ScannedFile,
 ): string[] {
+  // Type-specific dispatcher
+  if (file) {
+    switch (file.sourceType) {
+      case "glossary": {
+        const glossaryChunks = chunkGlossary(content);
+        if (glossaryChunks) {
+          return glossaryChunks;
+        }
+        // Fallback to default chunking if pattern not found
+        break;
+      }
+      case "knowledge":
+      case "doc": {
+        const sectionChunks = chunkByMarkdownSections(content, maxTokens);
+        if (sectionChunks) {
+          return sectionChunks;
+        }
+        // Fallback to default chunking if no headers found
+        break;
+      }
+      case "code":
+      case "contract": {
+        const astChunks = chunkByAST(content, file.absolutePath);
+        if (astChunks) {
+          return astChunks;
+        }
+        // Fallback to default chunking if parsing fails
+        break;
+      }
+    }
+  }
+
+  // Default chunking strategy
   const segments = splitIntoSegments(content);
   const chunks: string[] = [];
   let currentChunk: string[] = [];
@@ -119,7 +280,12 @@ export async function chunkFile(file: ScannedFile): Promise<Chunk[]> {
       return [];
     }
 
-    const chunks = chunkContent(content);
+    const chunks = chunkContent(
+      content,
+      CHUNK_CONFIG.maxTokens,
+      CHUNK_CONFIG.overlap,
+      file,
+    );
 
     return chunks.map((c, i) => ({
       file,
