@@ -1,4 +1,19 @@
-import { OLLAMA_CONFIG } from "./config.js";
+import { OLLAMA_CONFIG, getEmbeddingModel, } from "./config.js";
+// Current model used for embeddings - can be set via setModel()
+let currentModel = getEmbeddingModel();
+/**
+ * Set the embedding model to use.
+ */
+export function setModel(modelName) {
+    currentModel = getEmbeddingModel(modelName);
+    return currentModel;
+}
+/**
+ * Get current model config.
+ */
+export function getModel() {
+    return currentModel;
+}
 /**
  * Get embedding from Ollama for a single text.
  */
@@ -7,7 +22,7 @@ export async function getEmbedding(text) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            model: OLLAMA_CONFIG.model,
+            model: currentModel.ollamaModel,
             prompt: text,
         }),
     });
@@ -33,7 +48,7 @@ export async function getEmbeddings(texts, onProgress) {
         catch (error) {
             console.error(`Error getting embedding for text ${i}:`, error);
             // Return zero vector on error to maintain alignment
-            embeddings.push(new Array(OLLAMA_CONFIG.dimensions).fill(0));
+            embeddings.push(new Array(currentModel.dimensions).fill(0));
         }
     }
     return embeddings;
@@ -47,10 +62,10 @@ export async function checkOllama() {
         if (!response.ok)
             return false;
         const data = (await response.json());
-        const hasModel = data.models?.some((m) => m.name === OLLAMA_CONFIG.model ||
-            m.name === `${OLLAMA_CONFIG.model}:latest`);
+        const modelToCheck = currentModel.ollamaModel;
+        const hasModel = data.models?.some((m) => m.name === modelToCheck || m.name.startsWith(modelToCheck));
         if (!hasModel) {
-            console.error(`Model ${OLLAMA_CONFIG.model} not found. Available:`, data.models?.map((m) => m.name));
+            console.error(`Model ${modelToCheck} not found. Available:`, data.models?.map((m) => m.name));
         }
         return hasModel;
     }

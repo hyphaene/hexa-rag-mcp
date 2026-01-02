@@ -1,9 +1,23 @@
 import pg from "pg";
 import pgvector from "pgvector/pg";
-import { DB_CONFIG } from "./config.js";
+import { DB_CONFIG, getEmbeddingModel } from "./config.js";
 const { Pool } = pg;
 let pool = null;
 let typesRegistered = false;
+// Current model determines table name
+let currentModel = getEmbeddingModel();
+/**
+ * Set the model (determines which table to use).
+ */
+export function setDbModel(model) {
+    currentModel = model;
+}
+/**
+ * Get table name for current model.
+ */
+function getTableName() {
+    return `chunks_${currentModel.name}`;
+}
 export async function getPool() {
     if (!pool) {
         pool = new Pool(DB_CONFIG);
@@ -21,6 +35,36 @@ export async function getPool() {
     }
     return pool;
 }
+/**
+ * Ensure table exists for current model.
+ */
+export async function ensureTable() {
+    const pool = await getPool();
+    const table = getTableName();
+    const dim = currentModel.dimensions;
+    await pool.query(`
+    CREATE TABLE IF NOT EXISTS ${table} (
+      id SERIAL PRIMARY KEY,
+      source_path TEXT NOT NULL,
+      source_name TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      embedding vector(${dim}),
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(source_path, chunk_index)
+    )
+  `);
+    // Create indexes if not exist
+    await pool.query(`
+    CREATE INDEX IF NOT EXISTS ${table}_embedding_idx
+    ON ${table} USING hnsw (embedding vector_cosine_ops)
+  `);
+    await pool.query(`
+    CREATE INDEX IF NOT EXISTS ${table}_source_type_idx
+    ON ${table} (source_type)
+  `);
+}
 export async function closePool() {
     if (pool) {
         await pool.end();
@@ -32,7 +76,8 @@ export async function closePool() {
  */
 export async function insertChunk(chunk, embedding) {
     const pool = await getPool();
-    await pool.query(`INSERT INTO chunks (source_path, source_name, source_type, chunk_index, content, embedding)
+    const table = getTableName();
+    await pool.query(`INSERT INTO ${table} (source_path, source_name, source_type, chunk_index, content, embedding)
      VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (source_path, chunk_index)
      DO UPDATE SET content = $5, embedding = $6, created_at = NOW()`, [
@@ -51,6 +96,7 @@ export async function insertChunks(chunks) {
     if (chunks.length === 0)
         return;
     const pool = await getPool();
+    const table = getTableName();
     // Build bulk insert
     const values = [];
     const placeholders = [];
@@ -59,7 +105,7 @@ export async function insertChunks(chunks) {
         placeholders.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`);
         values.push(item.chunk.file.absolutePath, item.chunk.file.sourceName, item.chunk.file.sourceType, item.chunk.index, item.chunk.content, pgvector.toSql(item.embedding));
     });
-    await pool.query(`INSERT INTO chunks (source_path, source_name, source_type, chunk_index, content, embedding)
+    await pool.query(`INSERT INTO ${table} (source_path, source_name, source_type, chunk_index, content, embedding)
      VALUES ${placeholders.join(", ")}
      ON CONFLICT (source_path, chunk_index)
      DO UPDATE SET content = EXCLUDED.content, embedding = EXCLUDED.embedding, created_at = NOW()`, values);
@@ -69,20 +115,22 @@ export async function insertChunks(chunks) {
  */
 export async function deleteChunksForFile(filePath) {
     const pool = await getPool();
-    await pool.query("DELETE FROM chunks WHERE source_path = $1", [filePath]);
+    const table = getTableName();
+    await pool.query(`DELETE FROM ${table} WHERE source_path = $1`, [filePath]);
 }
 /**
  * Search for similar chunks.
  */
 export async function searchSimilar(embedding, limit = 10, sourceType) {
     const pool = await getPool();
+    const table = getTableName();
     const typeFilter = sourceType ? "AND source_type = $3" : "";
     const params = sourceType
         ? [pgvector.toSql(embedding), limit, sourceType]
         : [pgvector.toSql(embedding), limit];
     const result = await pool.query(`SELECT id, source_path, source_name, source_type, chunk_index, content, created_at,
             1 - (embedding <=> $1) as similarity
-     FROM chunks
+     FROM ${table}
      WHERE embedding IS NOT NULL ${typeFilter}
      ORDER BY embedding <=> $1
      LIMIT $2`, params);
@@ -111,10 +159,11 @@ export async function updateSyncState(filePath, mtime, hash) {
  */
 export async function getStats() {
     const pool = await getPool();
+    const table = getTableName();
     const [totalResult, byTypeResult, bySourceResult] = await Promise.all([
-        pool.query("SELECT COUNT(*) as count, COUNT(DISTINCT source_path) as files FROM chunks"),
-        pool.query("SELECT source_type, COUNT(*) as count FROM chunks GROUP BY source_type"),
-        pool.query("SELECT source_name, COUNT(*) as count FROM chunks GROUP BY source_name"),
+        pool.query(`SELECT COUNT(*) as count, COUNT(DISTINCT source_path) as files FROM ${table}`),
+        pool.query(`SELECT source_type, COUNT(*) as count FROM ${table} GROUP BY source_type`),
+        pool.query(`SELECT source_name, COUNT(*) as count FROM ${table} GROUP BY source_name`),
     ]);
     const byType = {};
     for (const row of byTypeResult.rows) {

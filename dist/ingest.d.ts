@@ -4,6 +4,7 @@ interface IngestOptions {
     incremental?: boolean;
     limit?: number;
     verbose?: boolean;
+    model?: string;
 }
 export declare function ingest(options?: IngestOptions): Promise<void>;
 export {};

@@ -1,8 +1,30 @@
-import { OLLAMA_CONFIG } from "./config.js";
+import {
+  OLLAMA_CONFIG,
+  type EmbeddingModel,
+  getEmbeddingModel,
+} from "./config.js";
 
 export interface EmbeddingResult {
   embedding: number[];
   model: string;
+}
+
+// Current model used for embeddings - can be set via setModel()
+let currentModel: EmbeddingModel = getEmbeddingModel();
+
+/**
+ * Set the embedding model to use.
+ */
+export function setModel(modelName: string): EmbeddingModel {
+  currentModel = getEmbeddingModel(modelName);
+  return currentModel;
+}
+
+/**
+ * Get current model config.
+ */
+export function getModel(): EmbeddingModel {
+  return currentModel;
 }
 
 /**
@@ -13,7 +35,7 @@ export async function getEmbedding(text: string): Promise<number[]> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: OLLAMA_CONFIG.model,
+      model: currentModel.ollamaModel,
       prompt: text,
     }),
   });
@@ -47,7 +69,7 @@ export async function getEmbeddings(
     } catch (error) {
       console.error(`Error getting embedding for text ${i}:`, error);
       // Return zero vector on error to maintain alignment
-      embeddings.push(new Array(OLLAMA_CONFIG.dimensions).fill(0));
+      embeddings.push(new Array(currentModel.dimensions).fill(0));
     }
   }
 
@@ -65,15 +87,14 @@ export async function checkOllama(): Promise<boolean> {
     const data = (await response.json()) as {
       models: Array<{ name: string }>;
     };
+    const modelToCheck = currentModel.ollamaModel;
     const hasModel = data.models?.some(
-      (m) =>
-        m.name === OLLAMA_CONFIG.model ||
-        m.name === `${OLLAMA_CONFIG.model}:latest`,
+      (m) => m.name === modelToCheck || m.name.startsWith(modelToCheck),
     );
 
     if (!hasModel) {
       console.error(
-        `Model ${OLLAMA_CONFIG.model} not found. Available:`,
+        `Model ${modelToCheck} not found. Available:`,
         data.models?.map((m) => m.name),
       );
     }

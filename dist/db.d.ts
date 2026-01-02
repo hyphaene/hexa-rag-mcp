@@ -1,6 +1,15 @@
 import pg from "pg";
+import { type EmbeddingModel } from "./config.js";
 import type { Chunk } from "./chunker.js";
+/**
+ * Set the model (determines which table to use).
+ */
+export declare function setDbModel(model: EmbeddingModel): void;
 export declare function getPool(): Promise<pg.Pool>;
+/**
+ * Ensure table exists for current model.
+ */
+export declare function ensureTable(): Promise<void>;
 export declare function closePool(): Promise<void>;
 export interface StoredChunk {
     id: number;

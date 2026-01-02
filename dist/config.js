@@ -66,11 +66,35 @@ export const DB_CONFIG = {
     database: "hexa_vectors",
     user: process.env.USER || "maximilien",
 };
+export const EMBEDDING_MODELS = {
+    nomic: {
+        name: "nomic",
+        ollamaModel: "nomic-embed-text",
+        dimensions: 768,
+        multilingual: false,
+    },
+    e5: {
+        name: "e5",
+        ollamaModel: "jeffh/intfloat-multilingual-e5-large:f16",
+        dimensions: 1024,
+        multilingual: true,
+    },
+};
 export const OLLAMA_CONFIG = {
     host: "http://localhost:11434",
+    // Default model - can be overridden via CLI
     model: "nomic-embed-text",
     dimensions: 768,
 };
+/**
+ * Get embedding model config by name, defaults to nomic
+ */
+export function getEmbeddingModel(name) {
+    if (name && EMBEDDING_MODELS[name]) {
+        return EMBEDDING_MODELS[name];
+    }
+    return EMBEDDING_MODELS.nomic;
+}
 export const CHUNK_CONFIG = {
     maxTokens: 500,
     overlap: 50, // tokens de chevauchement entre chunks

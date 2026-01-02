@@ -1,11 +1,20 @@
 import { Project, SyntaxKind, Node } from "ts-morph";
 
+// nomic-embed-text context limit is ~8192 tokens, we target ~2000 tokens max per chunk
+// ~3.5 chars per token → ~7000 chars max
+const MAX_CHUNK_CHARS = 7000;
+
 /**
  * Extract code constructs (functions, classes, interfaces, types) from TypeScript.
  * Each construct becomes a separate chunk with its documentation.
+ * Large constructs are subdivided to fit embedding model context.
  * Falls back to null if parsing fails or no constructs found.
  */
-export function chunkByAST(content: string, filePath: string): string[] | null {
+export function chunkByAST(
+  content: string,
+  filePath: string,
+  maxChars: number = MAX_CHUNK_CHARS,
+): string[] | null {
   try {
     const project = new Project({
       useInMemoryFileSystem: true,
@@ -72,11 +81,84 @@ export function chunkByAST(content: string, filePath: string): string[] | null {
       return null;
     }
 
-    return chunks;
+    // Subdivide any chunks that exceed maxChars
+    const finalChunks: string[] = [];
+    for (const chunk of chunks) {
+      if (chunk.length > maxChars) {
+        finalChunks.push(...subdivideCodeChunk(chunk, maxChars));
+      } else {
+        finalChunks.push(chunk);
+      }
+    }
+
+    return finalChunks;
   } catch {
     // Parsing failed - return null to trigger fallback
     return null;
   }
+}
+
+/**
+ * Subdivide a large code chunk by logical boundaries (methods, properties).
+ * Preserves context by keeping the first line (signature/header) in each sub-chunk.
+ */
+function subdivideCodeChunk(chunk: string, maxChars: number): string[] {
+  const lines = chunk.split("\n");
+  const chunks: string[] = [];
+
+  // Extract header (first non-empty, non-comment line that looks like a declaration)
+  let headerEnd = 0;
+  for (let i = 0; i < Math.min(lines.length, 10); i++) {
+    const line = lines[i].trim();
+    if (
+      line.startsWith("export ") ||
+      line.startsWith("class ") ||
+      line.startsWith("interface ") ||
+      line.startsWith("type ") ||
+      line.startsWith("function ") ||
+      line.startsWith("const ") ||
+      line.match(/^(public|private|protected|async)\s/)
+    ) {
+      headerEnd = i + 1;
+      break;
+    }
+    // Include JSDoc/comments in header
+    if (
+      line.startsWith("/*") ||
+      line.startsWith("*") ||
+      line.startsWith("//")
+    ) {
+      headerEnd = i + 1;
+    }
+  }
+
+  const header = lines.slice(0, headerEnd).join("\n");
+  const headerChars = header.length;
+
+  let currentChunk: string[] = [];
+  let currentChars = headerChars;
+
+  for (let i = headerEnd; i < lines.length; i++) {
+    const line = lines[i];
+    const lineChars = line.length + 1; // +1 for newline
+
+    if (currentChars + lineChars > maxChars && currentChunk.length > 0) {
+      // Flush current chunk with header
+      chunks.push(header + "\n" + currentChunk.join("\n"));
+      currentChunk = [];
+      currentChars = headerChars;
+    }
+
+    currentChunk.push(line);
+    currentChars += lineChars;
+  }
+
+  // Don't forget the last chunk
+  if (currentChunk.length > 0) {
+    chunks.push(header + "\n" + currentChunk.join("\n"));
+  }
+
+  return chunks.length > 0 ? chunks : [chunk];
 }
 
 /**

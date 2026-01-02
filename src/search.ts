@@ -1,13 +1,21 @@
 #!/usr/bin/env node
-import { getEmbedding, checkOllama } from "./embedder.js";
-import { searchSimilar, getStats, closePool } from "./db.js";
+import { getEmbedding, checkOllama, setModel, getModel } from "./embedder.js";
+import {
+  searchSimilar,
+  getStats,
+  closePool,
+  setDbModel,
+  ensureTable,
+} from "./db.js";
 import { basename, dirname } from "path";
+import { EMBEDDING_MODELS } from "./config.js";
 
 interface SearchOptions {
   query: string;
   limit?: number;
   type?: string;
   verbose?: boolean;
+  model?: string;
 }
 
 function formatPath(path: string): string {
@@ -36,11 +44,20 @@ function highlightMatch(content: string, maxLength: number = 200): string {
 }
 
 export async function search(options: SearchOptions): Promise<void> {
-  const { query, limit = 10, type, verbose = false } = options;
+  const { query, limit = 10, type, verbose = false, model } = options;
 
   if (!query.trim()) {
     console.error("Please provide a search query");
     process.exit(1);
+  }
+
+  // Set model if specified
+  if (model) {
+    const modelConfig = setModel(model);
+    setDbModel(modelConfig);
+  } else {
+    const modelConfig = getModel();
+    setDbModel(modelConfig);
   }
 
   // Check Ollama
@@ -51,7 +68,10 @@ export async function search(options: SearchOptions): Promise<void> {
     process.exit(1);
   }
 
-  console.log(`Searching for: "${query}"${type ? ` (type: ${type})` : ""}\n`);
+  const currentModel = getModel();
+  console.log(
+    `Searching for: "${query}"${type ? ` (type: ${type})` : ""} [model: ${currentModel.name}]\n`,
+  );
 
   // Get embedding for query
   const startTime = Date.now();
@@ -118,6 +138,7 @@ function parseArgs(): SearchOptions & { showStats?: boolean } {
   const args = process.argv.slice(2);
   const options: SearchOptions & { showStats?: boolean } = { query: "" };
   const queryParts: string[] = [];
+  const modelNames = Object.keys(EMBEDDING_MODELS);
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -128,6 +149,15 @@ function parseArgs(): SearchOptions & { showStats?: boolean } {
       options.type = args[++i];
     } else if (arg === "--verbose" || arg === "-v") {
       options.verbose = true;
+    } else if (arg === "--model" || arg === "-m") {
+      const modelName = args[++i];
+      if (!modelNames.includes(modelName)) {
+        console.error(
+          `Unknown model: ${modelName}. Available: ${modelNames.join(", ")}`,
+        );
+        process.exit(1);
+      }
+      options.model = modelName;
     } else if (arg === "--stats") {
       options.showStats = true;
     } else if (arg === "--help" || arg === "-h") {
@@ -139,13 +169,14 @@ Search your knowledge base using semantic similarity.
 Options:
   -l, --limit N     Number of results (default: 10)
   -t, --type TYPE   Filter by source type (knowledge, code, script, etc.)
+  -m, --model NAME  Embedding model to use (${modelNames.join(", ")})
   -v, --verbose     Show more details and content preview
   --stats           Show database statistics
   -h, --help        Show this help
 
 Examples:
   hexa-search "comment fonctionne le chunking"
-  hexa-search "SX status" --type code
+  hexa-search "SX status" --type code -m e5
   hexa-search "glossaire distribution" -l 5 -v
   hexa-search --stats
 `);

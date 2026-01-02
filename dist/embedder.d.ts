@@ -1,7 +1,16 @@
+import { type EmbeddingModel } from "./config.js";
 export interface EmbeddingResult {
     embedding: number[];
     model: string;
 }
+/**
+ * Set the embedding model to use.
+ */
+export declare function setModel(modelName: string): EmbeddingModel;
+/**
+ * Get current model config.
+ */
+export declare function getModel(): EmbeddingModel;
 /**
  * Get embedding from Ollama for a single text.
  */

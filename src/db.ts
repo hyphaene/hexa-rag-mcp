@@ -1,12 +1,29 @@
 import pg from "pg";
 import pgvector from "pgvector/pg";
-import { DB_CONFIG } from "./config.js";
+import { DB_CONFIG, type EmbeddingModel, getEmbeddingModel } from "./config.js";
 import type { Chunk } from "./chunker.js";
 
 const { Pool } = pg;
 
 let pool: pg.Pool | null = null;
 let typesRegistered = false;
+
+// Current model determines table name
+let currentModel: EmbeddingModel = getEmbeddingModel();
+
+/**
+ * Set the model (determines which table to use).
+ */
+export function setDbModel(model: EmbeddingModel): void {
+  currentModel = model;
+}
+
+/**
+ * Get table name for current model.
+ */
+function getTableName(): string {
+  return `chunks_${currentModel.name}`;
+}
 
 export async function getPool(): Promise<pg.Pool> {
   if (!pool) {
@@ -25,6 +42,39 @@ export async function getPool(): Promise<pg.Pool> {
   }
 
   return pool;
+}
+
+/**
+ * Ensure table exists for current model.
+ */
+export async function ensureTable(): Promise<void> {
+  const pool = await getPool();
+  const table = getTableName();
+  const dim = currentModel.dimensions;
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ${table} (
+      id SERIAL PRIMARY KEY,
+      source_path TEXT NOT NULL,
+      source_name TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      embedding vector(${dim}),
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(source_path, chunk_index)
+    )
+  `);
+
+  // Create indexes if not exist
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS ${table}_embedding_idx
+    ON ${table} USING hnsw (embedding vector_cosine_ops)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS ${table}_source_type_idx
+    ON ${table} (source_type)
+  `);
 }
 
 export async function closePool(): Promise<void> {
@@ -52,9 +102,10 @@ export async function insertChunk(
   embedding: number[],
 ): Promise<void> {
   const pool = await getPool();
+  const table = getTableName();
 
   await pool.query(
-    `INSERT INTO chunks (source_path, source_name, source_type, chunk_index, content, embedding)
+    `INSERT INTO ${table} (source_path, source_name, source_type, chunk_index, content, embedding)
      VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (source_path, chunk_index)
      DO UPDATE SET content = $5, embedding = $6, created_at = NOW()`,
@@ -78,6 +129,7 @@ export async function insertChunks(
   if (chunks.length === 0) return;
 
   const pool = await getPool();
+  const table = getTableName();
 
   // Build bulk insert
   const values: unknown[] = [];
@@ -99,7 +151,7 @@ export async function insertChunks(
   });
 
   await pool.query(
-    `INSERT INTO chunks (source_path, source_name, source_type, chunk_index, content, embedding)
+    `INSERT INTO ${table} (source_path, source_name, source_type, chunk_index, content, embedding)
      VALUES ${placeholders.join(", ")}
      ON CONFLICT (source_path, chunk_index)
      DO UPDATE SET content = EXCLUDED.content, embedding = EXCLUDED.embedding, created_at = NOW()`,
@@ -112,7 +164,8 @@ export async function insertChunks(
  */
 export async function deleteChunksForFile(filePath: string): Promise<void> {
   const pool = await getPool();
-  await pool.query("DELETE FROM chunks WHERE source_path = $1", [filePath]);
+  const table = getTableName();
+  await pool.query(`DELETE FROM ${table} WHERE source_path = $1`, [filePath]);
 }
 
 /**
@@ -124,6 +177,7 @@ export async function searchSimilar(
   sourceType?: string,
 ): Promise<Array<StoredChunk & { similarity: number }>> {
   const pool = await getPool();
+  const table = getTableName();
 
   const typeFilter = sourceType ? "AND source_type = $3" : "";
   const params = sourceType
@@ -133,7 +187,7 @@ export async function searchSimilar(
   const result = await pool.query<StoredChunk & { similarity: number }>(
     `SELECT id, source_path, source_name, source_type, chunk_index, content, created_at,
             1 - (embedding <=> $1) as similarity
-     FROM chunks
+     FROM ${table}
      WHERE embedding IS NOT NULL ${typeFilter}
      ORDER BY embedding <=> $1
      LIMIT $2`,
@@ -185,16 +239,17 @@ export async function getStats(): Promise<{
   bySource: Record<string, number>;
 }> {
   const pool = await getPool();
+  const table = getTableName();
 
   const [totalResult, byTypeResult, bySourceResult] = await Promise.all([
     pool.query(
-      "SELECT COUNT(*) as count, COUNT(DISTINCT source_path) as files FROM chunks",
+      `SELECT COUNT(*) as count, COUNT(DISTINCT source_path) as files FROM ${table}`,
     ),
     pool.query(
-      "SELECT source_type, COUNT(*) as count FROM chunks GROUP BY source_type",
+      `SELECT source_type, COUNT(*) as count FROM ${table} GROUP BY source_type`,
     ),
     pool.query(
-      "SELECT source_name, COUNT(*) as count FROM chunks GROUP BY source_name",
+      `SELECT source_name, COUNT(*) as count FROM ${table} GROUP BY source_name`,
     ),
   ]);
 

@@ -3,7 +3,7 @@ import { createHash } from "crypto";
 import { readFile } from "fs/promises";
 import { scanAllSources, type ScannedFile } from "./scanner.js";
 import { chunkFile, type Chunk } from "./chunker.js";
-import { getEmbedding, checkOllama } from "./embedder.js";
+import { getEmbedding, checkOllama, setModel, getModel } from "./embedder.js";
 import {
   insertChunk,
   deleteChunksForFile,
@@ -11,13 +11,17 @@ import {
   updateSyncState,
   getStats,
   closePool,
+  setDbModel,
+  ensureTable,
 } from "./db.js";
+import { EMBEDDING_MODELS } from "./config.js";
 
 interface IngestOptions {
   sources?: string[];
   incremental?: boolean;
   limit?: number;
   verbose?: boolean;
+  model?: string;
 }
 
 async function computeFileHash(filePath: string): Promise<string> {
@@ -72,7 +76,29 @@ async function processFile(
 }
 
 export async function ingest(options: IngestOptions = {}): Promise<void> {
-  const { sources, incremental = false, limit, verbose = false } = options;
+  const {
+    sources,
+    incremental = false,
+    limit,
+    verbose = false,
+    model,
+  } = options;
+
+  // Set model if specified
+  if (model) {
+    const modelConfig = setModel(model);
+    setDbModel(modelConfig);
+    console.log(
+      `Using model: ${modelConfig.name} (${modelConfig.ollamaModel}, ${modelConfig.dimensions}d)`,
+    );
+  } else {
+    const modelConfig = getModel();
+    setDbModel(modelConfig);
+    console.log(`Using default model: ${modelConfig.name}`);
+  }
+
+  // Ensure table exists for this model
+  await ensureTable();
 
   console.log("Checking Ollama...");
   if (!(await checkOllama())) {
@@ -155,6 +181,7 @@ export async function ingest(options: IngestOptions = {}): Promise<void> {
 function parseArgs(): IngestOptions {
   const args = process.argv.slice(2);
   const options: IngestOptions = {};
+  const modelNames = Object.keys(EMBEDDING_MODELS);
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -168,6 +195,15 @@ function parseArgs(): IngestOptions {
     } else if (arg === "--source" || arg === "-s") {
       options.sources = options.sources || [];
       options.sources.push(args[++i]);
+    } else if (arg === "--model" || arg === "-m") {
+      const modelName = args[++i];
+      if (!modelNames.includes(modelName)) {
+        console.error(
+          `Unknown model: ${modelName}. Available: ${modelNames.join(", ")}`,
+        );
+        process.exit(1);
+      }
+      options.model = modelName;
     } else if (arg === "--help" || arg === "-h") {
       console.log(`
 Usage: hexa-ingest [options]
@@ -176,11 +212,13 @@ Options:
   -i, --incremental  Only process files that have changed
   -s, --source NAME  Only process specific source(s) (can be repeated)
   -l, --limit N      Limit to first N files (for testing)
+  -m, --model NAME   Embedding model to use (${modelNames.join(", ")})
   -v, --verbose      Show detailed progress
   -h, --help         Show this help
 
 Examples:
-  hexa-ingest                           # Full ingestion
+  hexa-ingest                           # Full ingestion with default model
+  hexa-ingest --model e5                # Use multilingual e5 model
   hexa-ingest --incremental             # Only changed files
   hexa-ingest -s front -s bff          # Only front and bff sources
   hexa-ingest --limit 10 --verbose     # Test with 10 files
