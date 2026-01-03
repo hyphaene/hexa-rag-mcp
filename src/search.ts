@@ -7,7 +7,10 @@ import {
   closePool,
   setDbModel,
   ensureTable,
+  type StoredChunk,
 } from "./db.js";
+import { rerank, checkReranker } from "./reranker.js";
+import { generateAnswer, checkGenerator } from "./generator.js";
 import { basename, dirname } from "path";
 import { EMBEDDING_MODELS } from "./config.js";
 
@@ -19,6 +22,8 @@ interface SearchOptions {
   model?: string;
   hybrid?: boolean;
   alpha?: number;
+  useRerank?: boolean;
+  rag?: boolean;
 }
 
 function formatPath(path: string): string {
@@ -55,6 +60,8 @@ export async function search(options: SearchOptions): Promise<void> {
     model,
     hybrid = false,
     alpha = 0.7,
+    useRerank = false,
+    rag = false,
   } = options;
 
   if (!query.trim()) {
@@ -80,21 +87,31 @@ export async function search(options: SearchOptions): Promise<void> {
   }
 
   const currentModel = getModel();
-  const searchMode = hybrid ? `hybrid (α=${alpha})` : "vector";
+  let searchMode = hybrid ? `hybrid (α=${alpha})` : "vector";
+  if (useRerank) searchMode += " + rerank";
   console.log(
     `Searching for: "${query}"${type ? ` (type: ${type})` : ""} [model: ${currentModel.name}, mode: ${searchMode}]\n`,
   );
+
+  // Check reranker if needed
+  if (useRerank && !(await checkReranker())) {
+    console.error(
+      "Reranker model not available. Run: ollama pull qllama/bge-reranker-v2-m3",
+    );
+    process.exit(1);
+  }
 
   // Get embedding for query
   const startTime = Date.now();
   const embedding = await getEmbedding(query);
   const embedTime = Date.now() - startTime;
 
-  // Search
+  // Search - fetch more candidates if reranking
   const searchStart = Date.now();
-  const results = hybrid
-    ? await searchHybrid(embedding, query, limit, alpha)
-    : await searchSimilar(embedding, limit, type);
+  const fetchLimit = useRerank ? Math.max(limit * 3, 20) : limit;
+  let results = hybrid
+    ? await searchHybrid(embedding, query, fetchLimit, alpha)
+    : await searchSimilar(embedding, fetchLimit, type);
   const searchTime = Date.now() - searchStart;
 
   if (results.length === 0) {
@@ -102,14 +119,30 @@ export async function search(options: SearchOptions): Promise<void> {
     return;
   }
 
+  // Rerank if requested
+  let rerankTime = 0;
+  if (useRerank) {
+    const rerankStart = Date.now();
+    console.log(`Reranking ${results.length} candidates...`);
+    const reranked = await rerank(query, results, (r) => r.content, limit);
+    results = reranked;
+    rerankTime = Date.now() - rerankStart;
+  }
+
   // Display results
   console.log(`Found ${results.length} results:\n`);
 
-  for (let i = 0; i < results.length; i++) {
+  for (let i = 0; i < Math.min(results.length, limit); i++) {
     const r = results[i];
     const path = formatPath(r.source_path);
 
-    if (hybrid && "hybrid_score" in r) {
+    if (useRerank && "rerankScore" in r) {
+      const rr = r as typeof r & { rerankScore: number };
+      const sim = formatPercentage(rr.similarity);
+      console.log(
+        `${i + 1}. [rerank:${rr.rerankScore.toFixed(2)}] ${rr.source_name}/${rr.source_type} (vec:${sim})`,
+      );
+    } else if (hybrid && "hybrid_score" in r) {
       const hr = r as typeof r & { hybrid_score: number; bm25_rank: number };
       const score = (hr.hybrid_score * 1000).toFixed(1);
       const sim = formatPercentage(hr.similarity);
@@ -138,6 +171,28 @@ export async function search(options: SearchOptions): Promise<void> {
   if (verbose) {
     console.log(`---`);
     console.log(`Embed time: ${embedTime}ms, Search time: ${searchTime}ms`);
+  }
+
+  // RAG mode: generate answer from retrieved contexts
+  if (rag) {
+    if (!(await checkGenerator())) {
+      console.error("Generator model not available. Run: ollama pull mistral");
+      process.exit(1);
+    }
+
+    console.log("---\n");
+    console.log("Generating answer...\n");
+
+    const contexts = results.slice(0, 5).map((r) => ({
+      content: r.content,
+      source: formatPath(r.source_path),
+      type: r.source_type,
+    }));
+
+    const answer = await generateAnswer({ query, contexts });
+    console.log("## Answer\n");
+    console.log(answer);
+    console.log();
   }
 }
 
@@ -185,6 +240,10 @@ function parseArgs(): SearchOptions & { showStats?: boolean } {
       options.hybrid = true;
     } else if (arg === "--alpha" || arg === "-a") {
       options.alpha = parseFloat(args[++i]);
+    } else if (arg === "--rerank" || arg === "-R") {
+      options.useRerank = true;
+    } else if (arg === "--rag") {
+      options.rag = true;
     } else if (arg === "--stats") {
       options.showStats = true;
     } else if (arg === "--help" || arg === "-h") {
@@ -199,6 +258,8 @@ Options:
   -m, --model NAME  Embedding model to use (${modelNames.join(", ")})
   -H, --hybrid      Use hybrid search (vector + BM25)
   -a, --alpha N     Vector weight for hybrid (0-1, default: 0.7)
+  -R, --rerank      Rerank results with cross-encoder (slower, more accurate)
+  --rag             Generate a synthesized answer from retrieved contexts
   -v, --verbose     Show more details and content preview
   --stats           Show database statistics
   -h, --help        Show this help
@@ -207,7 +268,7 @@ Examples:
   hexa-search "comment fonctionne le chunking"
   hexa-search "SX status" --type code -m bge
   hexa-search "SEE-12345" --hybrid           # hybrid for exact matches
-  hexa-search "glossaire" -H -a 0.5          # balanced hybrid
+  hexa-search "c'est quoi un SX" --rag       # get a synthesized answer
   hexa-search --stats
 `);
       process.exit(0);

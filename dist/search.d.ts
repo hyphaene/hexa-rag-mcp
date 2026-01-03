@@ -7,6 +7,8 @@ interface SearchOptions {
     model?: string;
     hybrid?: boolean;
     alpha?: number;
+    useRerank?: boolean;
+    rag?: boolean;
 }
 export declare function search(options: SearchOptions): Promise<void>;
 export {};
