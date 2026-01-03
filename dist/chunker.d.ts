@@ -4,7 +4,14 @@ export interface Chunk {
     index: number;
     content: string;
     tokenCount: number;
+    /** Contextual prefix added before content for embedding */
+    context?: string;
 }
+/**
+ * Generate contextual prefix for a chunk based on file metadata.
+ * This helps the embedding model understand what the chunk is about.
+ */
+export declare function generateChunkContext(file: ScannedFile, content: string): string;
 /**
  * Chunk a file's content into segments of ~maxTokens.
  * Uses overlap to maintain context between chunks.

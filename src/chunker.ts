@@ -8,6 +8,67 @@ export interface Chunk {
   index: number;
   content: string;
   tokenCount: number;
+  /** Contextual prefix added before content for embedding */
+  context?: string;
+}
+
+/**
+ * Generate contextual prefix for a chunk based on file metadata.
+ * This helps the embedding model understand what the chunk is about.
+ */
+export function generateChunkContext(
+  file: ScannedFile,
+  content: string,
+): string {
+  const parts: string[] = [];
+
+  // Source type context
+  const typeLabels: Record<string, string> = {
+    glossary: "Business glossary definition",
+    knowledge: "Technical documentation",
+    code: "Source code",
+    contract: "API contract definition",
+    script: "Shell script",
+    plugin: "Claude Code plugin",
+    doc: "Documentation",
+  };
+  parts.push(typeLabels[file.sourceType] || file.sourceType);
+
+  // Source name for context
+  parts.push(`from ${file.sourceName}`);
+
+  // Extract topic from content if possible
+  const topic = extractTopic(content, file.sourceType);
+  if (topic) {
+    parts.push(`about ${topic}`);
+  }
+
+  return `[${parts.join(" | ")}]\n`;
+}
+
+/**
+ * Extract the main topic from chunk content.
+ */
+function extractTopic(content: string, sourceType: string): string | null {
+  // For glossary: extract the term being defined
+  if (sourceType === "glossary") {
+    const match = content.match(/^\*\*([^*]+)\*\*/);
+    if (match) return match[1].trim();
+  }
+
+  // For markdown: extract first header
+  const headerMatch = content.match(/^#{1,3}\s+(.+)$/m);
+  if (headerMatch) return headerMatch[1].trim();
+
+  // For code: extract class/function/interface name
+  if (sourceType === "code" || sourceType === "contract") {
+    const codeMatch = content.match(
+      /(?:export\s+)?(?:class|interface|type|function|const)\s+(\w+)/,
+    );
+    if (codeMatch) return codeMatch[1];
+  }
+
+  return null;
 }
 
 /**
@@ -299,6 +360,7 @@ export async function chunkFile(
       index: i,
       content: c,
       tokenCount: estimateTokens(c),
+      context: generateChunkContext(file, c),
     }));
   } catch (error) {
     console.error(`Error reading ${file.absolutePath}:`, error);

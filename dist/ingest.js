@@ -33,7 +33,11 @@ async function processFile(file, verbose, maxTokens) {
         await deleteChunksForFile(file.absolutePath);
         // Process each chunk
         for (const chunk of chunks) {
-            const embedding = await getEmbedding(chunk.content);
+            // Use contextual content for embedding (context + content)
+            const textForEmbedding = chunk.context
+                ? chunk.context + chunk.content
+                : chunk.content;
+            const embedding = await getEmbedding(textForEmbedding);
             await insertChunk(chunk, embedding);
         }
         // Update sync state
