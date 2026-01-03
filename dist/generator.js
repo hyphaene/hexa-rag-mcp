@@ -1,5 +1,18 @@
 import { OLLAMA_CONFIG } from "./config.js";
-const GENERATOR_MODEL = "mistral";
+export const LLM_MODELS = {
+    qwen: "qwen2.5:7b",
+    deepseek: "deepseek-r1:8b",
+};
+let currentLLM = LLM_MODELS.qwen;
+export function setLLM(model) {
+    if (!LLM_MODELS[model]) {
+        throw new Error(`Unknown LLM: ${model}. Available: ${Object.keys(LLM_MODELS).join(", ")}`);
+    }
+    currentLLM = LLM_MODELS[model];
+}
+export function getLLM() {
+    return currentLLM;
+}
 /**
  * Generate a response using retrieved contexts.
  */
@@ -17,7 +30,8 @@ export async function generateAnswer(options) {
     const prompt = `Tu es un assistant qui répond aux questions en utilisant uniquement les sources fournies.
 ${langInstruction}
 Si les sources ne contiennent pas l'information, dis-le clairement.
-Sois concis et précis.
+Utilise des références [1], [2], etc. pour citer tes sources dans ta réponse.
+Sois complet mais concis.
 
 ## Sources
 
@@ -32,12 +46,12 @@ ${query}
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            model: GENERATOR_MODEL,
+            model: currentLLM,
             prompt,
             stream: false,
             options: {
-                temperature: 0.3,
-                num_predict: 500,
+                temperature: 0.1,
+                num_predict: 1000,
             },
         }),
     });
@@ -48,7 +62,7 @@ ${query}
     return result.response.trim();
 }
 /**
- * Check if generator model is available.
+ * Check if current generator model is available.
  */
 export async function checkGenerator() {
     try {
@@ -56,8 +70,7 @@ export async function checkGenerator() {
         if (!response.ok)
             return false;
         const data = (await response.json());
-        return (data.models?.some((m) => m.name === GENERATOR_MODEL ||
-            m.name.startsWith(GENERATOR_MODEL + ":")) ?? false);
+        return (data.models?.some((m) => m.name === currentLLM || m.name.startsWith(currentLLM.split(":")[0])) ?? false);
     }
     catch {
         return false;

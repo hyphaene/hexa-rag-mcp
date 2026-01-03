@@ -10,7 +10,14 @@ import {
   type StoredChunk,
 } from "./db.js";
 import { rerank, checkReranker } from "./reranker.js";
-import { generateAnswer, checkGenerator } from "./generator.js";
+import {
+  generateAnswer,
+  checkGenerator,
+  setLLM,
+  getLLM,
+  LLM_MODELS,
+  type LLMModel,
+} from "./generator.js";
 import { basename, dirname } from "path";
 import { EMBEDDING_MODELS } from "./config.js";
 
@@ -24,6 +31,7 @@ interface SearchOptions {
   alpha?: number;
   useRerank?: boolean;
   rag?: boolean;
+  llm?: LLMModel;
 }
 
 function formatPath(path: string): string {
@@ -62,7 +70,13 @@ export async function search(options: SearchOptions): Promise<void> {
     alpha = 0.7,
     useRerank = false,
     rag = false,
+    llm,
   } = options;
+
+  // Set LLM if specified
+  if (llm) {
+    setLLM(llm);
+  }
 
   if (!query.trim()) {
     console.error("Please provide a search query");
@@ -181,7 +195,7 @@ export async function search(options: SearchOptions): Promise<void> {
     }
 
     console.log("---\n");
-    console.log("Generating answer...\n");
+    console.log(`Generating answer with ${getLLM()}...\n`);
 
     const contexts = results.slice(0, 5).map((r) => ({
       content: r.content,
@@ -189,9 +203,29 @@ export async function search(options: SearchOptions): Promise<void> {
       type: r.source_type,
     }));
 
+    const genStart = Date.now();
     const answer = await generateAnswer({ query, contexts });
+    const genTime = Date.now() - genStart;
+
     console.log("## Answer\n");
     console.log(answer);
+    console.log();
+
+    // Display sources
+    console.log("## Sources\n");
+    contexts.forEach((c, i) => {
+      console.log(`[${i + 1}] ${c.source} (${c.type})`);
+    });
+    console.log();
+
+    // Display timing
+    const totalTime = Date.now() - startTime;
+    console.log("## Timing\n");
+    console.log(`- Embedding: ${embedTime}ms`);
+    console.log(`- Search: ${searchTime}ms`);
+    if (rerankTime > 0) console.log(`- Rerank: ${rerankTime}ms`);
+    console.log(`- Generation: ${genTime}ms`);
+    console.log(`- Total: ${totalTime}ms`);
     console.log();
   }
 }
@@ -244,6 +278,16 @@ function parseArgs(): SearchOptions & { showStats?: boolean } {
       options.useRerank = true;
     } else if (arg === "--rag") {
       options.rag = true;
+    } else if (arg === "--llm") {
+      const llmName = args[++i] as LLMModel;
+      const llmNames = Object.keys(LLM_MODELS);
+      if (!llmNames.includes(llmName)) {
+        console.error(
+          `Unknown LLM: ${llmName}. Available: ${llmNames.join(", ")}`,
+        );
+        process.exit(1);
+      }
+      options.llm = llmName;
     } else if (arg === "--stats") {
       options.showStats = true;
     } else if (arg === "--help" || arg === "-h") {
@@ -260,6 +304,7 @@ Options:
   -a, --alpha N     Vector weight for hybrid (0-1, default: 0.7)
   -R, --rerank      Rerank results with cross-encoder (slower, more accurate)
   --rag             Generate a synthesized answer from retrieved contexts
+  --llm NAME        LLM for RAG generation (${Object.keys(LLM_MODELS).join(", ")})
   -v, --verbose     Show more details and content preview
   --stats           Show database statistics
   -h, --help        Show this help

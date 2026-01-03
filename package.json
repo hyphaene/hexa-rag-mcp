@@ -6,7 +6,10 @@
   "scripts": {
     "build": "tsc",
     "ingest": "tsx src/ingest.ts",
-    "search": "tsx src/search.ts"
+    "search": "tsx src/search.ts",
+    "rag": "tsx src/search.ts --model bge --rag",
+    "rag:qwen": "tsx src/search.ts --model bge --rag --llm qwen",
+    "rag:deepseek": "tsx src/search.ts --model bge --rag --llm deepseek"
   },
   "bin": {
     "hexa-ingest": "./dist/ingest.js",
