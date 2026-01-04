@@ -1,6 +1,4 @@
-import { OLLAMA_CONFIG } from "./config.js";
-
-const RERANKER_MODEL = "qllama/bge-reranker-v2-m3";
+import { getConfig, getRerankerModel } from "./config.js";
 
 interface RerankResult {
   index: number;
@@ -18,11 +16,12 @@ async function getRerankScore(
   // BGE reranker expects query and passage concatenated with special tokens
   const input = `query: ${query} passage: ${document}`;
 
-  const response = await fetch(`${OLLAMA_CONFIG.host}/api/embeddings`, {
+  const config = getConfig();
+  const response = await fetch(`${config.ollama.host}/api/embeddings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: RERANKER_MODEL,
+      model: getRerankerModel(),
       prompt: input,
     }),
   });
@@ -77,13 +76,15 @@ export async function rerank<T>(
  */
 export async function checkReranker(): Promise<boolean> {
   try {
-    const response = await fetch(`${OLLAMA_CONFIG.host}/api/tags`);
+    const config = getConfig();
+    const rerankerModel = getRerankerModel();
+    const response = await fetch(`${config.ollama.host}/api/tags`);
     if (!response.ok) return false;
 
     const data = (await response.json()) as { models: Array<{ name: string }> };
     return (
       data.models?.some(
-        (m) => m.name === RERANKER_MODEL || m.name.startsWith(RERANKER_MODEL),
+        (m) => m.name === rerankerModel || m.name.startsWith(rerankerModel),
       ) ?? false
     );
   } catch {

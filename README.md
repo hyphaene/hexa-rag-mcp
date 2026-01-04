@@ -1,28 +1,283 @@
-# Hexa Vector Postgres
+# hexa-vector
 
-Système de recherche sémantique local pour Hexactitude, avec RAG optionnel.
+Semantic search for your codebase and documentation using PostgreSQL + pgvector + Ollama.
 
-## Ce qu'on a mis en place
+## Features
 
-### Stack technique
+- **Semantic search** - Find relevant code and docs by meaning, not just keywords
+- **Hybrid search** - Combine vector similarity with BM25 full-text search
+- **RAG support** - Generate answers from your knowledge base using local LLMs
+- **MCP server** - Integrate with Claude Code and other MCP clients
+- **Multi-model** - Support for nomic, e5, and bge embeddings
 
-| Composant        | Rôle                          | Version         |
-| ---------------- | ----------------------------- | --------------- |
-| PostgreSQL 16    | Base de données               | brew            |
-| pgvector         | Extension vectors pour PG     | 0.8.1 (compilé) |
-| Ollama           | Runtime LLM local             | brew            |
-| nomic-embed-text | Modèle d'embeddings (768 dim) | ~274MB          |
-| mistral          | Modèle LLM pour RAG           | ~4.1GB          |
+## Prerequisites
 
-### Architecture
+- **PostgreSQL** with [pgvector](https://github.com/pgvector/pgvector) extension
+- **Ollama** running locally with embedding models
+
+### Quick setup
+
+```bash
+# PostgreSQL (macOS)
+brew install postgresql@16
+brew services start postgresql@16
+createdb hexa_vectors
+psql hexa_vectors -c "CREATE EXTENSION vector;"
+
+# Ollama
+brew install ollama
+brew services start ollama
+ollama pull bge-m3           # Embeddings (multilingual)
+ollama pull qwen2.5:7b       # LLM for RAG
+```
+
+## Installation
+
+```bash
+npm install -g hexa-vector
+```
+
+Or use npx:
+
+```bash
+npx hexa-vector init
+```
+
+## Quick Start
+
+```bash
+# 1. Create global config (one-time setup)
+hexa-vector init --global
+
+# 2. Edit ~/.config/hexa-vector/config.json to add your sources
+
+# 3. Check system requirements
+hexa-vector doctor
+
+# 4. Index your files
+hexa-vector ingest
+
+# 5. Search!
+hexa-vector search "how does authentication work"
+
+# 6. Or get a synthesized answer
+hexa-vector search "what is the login flow" --rag
+```
+
+## Configuration
+
+### Config file locations
+
+hexa-vector looks for config in this order:
+
+1. `--config <path>` - Explicit path (highest priority)
+2. `./hexa-vector.config.json` - Project config (walks up directories)
+3. `~/.config/hexa-vector/config.json` - Global config (fallback)
+
+### Global config (recommended)
+
+For personal use, create a global config once:
+
+```bash
+hexa-vector init --global           # Creates ~/.config/hexa-vector/config.json
+hexa-vector init --global -i        # Interactive wizard
+```
+
+### Project config
+
+For project-specific settings, create a local config:
+
+```json
+{
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "hexa_vectors",
+    "user": "postgres"
+  },
+  "ollama": {
+    "host": "http://localhost:11434"
+  },
+  "sources": [
+    {
+      "name": "docs",
+      "type": "knowledge",
+      "path": "./docs",
+      "patterns": ["**/*.md"],
+      "exclude": ["**/node_modules/**"]
+    },
+    {
+      "name": "src",
+      "type": "code",
+      "path": "./src",
+      "patterns": ["**/*.ts", "**/*.js"],
+      "exclude": ["**/*.test.ts", "**/node_modules/**"]
+    }
+  ],
+  "models": {
+    "embedding": "bge",
+    "reranker": "qllama/bge-reranker-v2-m3",
+    "llm": "qwen"
+  },
+  "chunking": {
+    "maxTokens": 500,
+    "overlap": 50
+  }
+}
+```
+
+### Source types
+
+| Type        | Description                   |
+| ----------- | ----------------------------- |
+| `knowledge` | Documentation, markdown files |
+| `code`      | Source code                   |
+| `script`    | Shell scripts, automation     |
+| `plugin`    | Plugin/extension code         |
+| `glossary`  | Term definitions              |
+| `contract`  | API contracts, schemas        |
+| `doc`       | General documentation         |
+
+### Embedding models
+
+| Model   | Dimensions | Multilingual | Best for                  |
+| ------- | ---------- | ------------ | ------------------------- |
+| `nomic` | 768        | No           | Fast, English content     |
+| `e5`    | 1024       | Yes          | Multilingual docs         |
+| `bge`   | 1024       | Yes          | Best quality, recommended |
+
+## CLI Commands
+
+### `hexa-vector init`
+
+Create a new config file.
+
+```bash
+hexa-vector init                    # Project config (./hexa-vector.config.json)
+hexa-vector init --global           # Global config (~/.config/hexa-vector/config.json)
+hexa-vector init -g -i              # Global + interactive wizard
+```
+
+### `hexa-vector doctor`
+
+Check system requirements (PostgreSQL, Ollama, models).
+
+```bash
+hexa-vector doctor
+```
+
+### `hexa-vector ingest`
+
+Index files from configured sources.
+
+```bash
+hexa-vector ingest                  # All sources
+hexa-vector ingest -s docs          # Specific source
+```
+
+### `hexa-vector search`
+
+Search the knowledge base.
+
+```bash
+hexa-vector search "query"
+hexa-vector search "query" --limit 20
+hexa-vector search "query" --type code
+hexa-vector search "query" --hybrid          # Vector + BM25
+hexa-vector search "query" --rerank          # Cross-encoder reranking
+hexa-vector search "query" --rag             # Generate answer
+hexa-vector search "query" --rag --llm deepseek
+```
+
+### `hexa-vector serve`
+
+Start MCP server for Claude Code integration.
+
+```bash
+hexa-vector serve
+```
+
+### `hexa-vector stats`
+
+Show database statistics.
+
+```bash
+hexa-vector stats
+```
+
+## MCP Integration
+
+Add to your Claude Code settings (`~/.claude/settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "hexa-vector": {
+      "command": "hexa-vector-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+### MCP Tools
+
+| Tool     | Description                                |
+| -------- | ------------------------------------------ |
+| `search` | Semantic search with hybrid/rerank options |
+| `rag`    | Search + generate synthesized answer       |
+| `stats`  | Database statistics                        |
+
+## Programmatic API
+
+```typescript
+import {
+  loadConfig,
+  getEmbedding,
+  searchSimilar,
+  generateAnswer,
+} from "hexa-vector";
+
+// Load config
+loadConfig("./hexa-vector.config.json");
+
+// Search
+const embedding = await getEmbedding("my query");
+const results = await searchSimilar(embedding, 10);
+
+// RAG
+const answer = await generateAnswer({
+  query: "How does auth work?",
+  contexts: results.map((r) => ({
+    content: r.content,
+    source: r.source_path,
+    type: r.source_type,
+  })),
+});
+```
+
+## Environment Variables
+
+Override config via environment:
+
+```bash
+PGHOST=localhost
+PGPORT=5432
+PGDATABASE=hexa_vectors
+PGUSER=postgres
+PGPASSWORD=secret
+OLLAMA_HOST=http://localhost:11434
+```
+
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    VECTOR SEARCH                                │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  Fichiers ──► Chunker ──► Ollama ──► pgvector ──► Résultats     │
-│  (md,ts,sh)   (500 tok)   (embed)    (cosine)                   │
+│  Files ──► Chunker ──► Ollama ──► pgvector ──► Results          │
+│  (md,ts)   (500 tok)   (embed)    (cosine)                      │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 
@@ -30,210 +285,21 @@ Système de recherche sémantique local pour Hexactitude, avec RAG optionnel.
 │                         RAG                                     │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  Question ──► Vector Search ──► Top chunks ──► Mistral ──► Réponse
+│  Question ──► Vector Search ──► Top chunks ──► LLM ──► Answer   │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Contenu indexé
+## Resource Usage
 
-| Source                                        | Fichiers | Chunks | Type      |
-| --------------------------------------------- | -------- | ------ | --------- |
-| ~/Hexactitude/\*_/_.md                        | ~1200    | ~4200  | knowledge |
-| ~/Hexactitude/claude/scripts/\*_/_.sh         | ~91      | ~300   | script    |
-| ~/Hexactitude/claude/marketplace/plugins/\*\* | ~65      | ~325   | plugin    |
-| ~/Adeo/ahs-documentation/\*_/_.md             | 42       | ~120   | glossary  |
-| front/src/\*_/_.{ts,vue}                      | ~530     | ~800   | code      |
-| bff/src/\*_/_.ts                              | ~280     | ~530   | code      |
-| contracts/src/\*_/_.ts                        | ~86      | ~170   | contract  |
+| Resource      | Usage                       |
+| ------------- | --------------------------- |
+| RAM (idle)    | ~100MB (PostgreSQL)         |
+| RAM (search)  | ~1.5GB (Ollama loads model) |
+| RAM (RAG)     | ~5GB (LLM + embedding)      |
+| Disk (DB)     | ~150MB per 10K chunks       |
+| Disk (models) | ~4-8GB depending on models  |
 
-**Total : ~2300 fichiers, ~6500 chunks**
+## License
 
-### Exclusions automatiques
-
-- `**/node_modules/**`
-- `**/gitignored/**`
-- `**/.git/**`
-- `**/dist/**`, `**/build/**`
-- `**/cache/**`
-- Fichiers > 100KB
-
-## Usage
-
-### Commandes CLI
-
-```bash
-# Recherche sémantique
-hexa-search "comment gérer les erreurs API"
-hexa-search "SX status" --type code -v
-hexa-search --stats
-
-# RAG (search + synthèse LLM)
-hexa-rag "Quels sont les status possibles d'une SX ?"
-hexa-rag "Comment fonctionne la validation budget ?" -l 3
-
-# Ingestion
-hexa-ingest                    # Full (première fois)
-hexa-ingest --incremental      # Seulement les fichiers modifiés
-hexa-ingest --source front     # Une source spécifique
-hexa-ingest --limit 10 -v      # Test
-```
-
-### Options
-
-| Option          | Description                                                            |
-| --------------- | ---------------------------------------------------------------------- |
-| `--type TYPE`   | Filtrer par type (knowledge, code, script, plugin, glossary, contract) |
-| `-l, --limit N` | Nombre de résultats                                                    |
-| `-v, --verbose` | Détails et preview                                                     |
-| `--stats`       | Statistiques de la DB                                                  |
-| `--incremental` | Ne traiter que les fichiers modifiés                                   |
-| `--source NAME` | Filtrer par source                                                     |
-
-## Ce qu'on a testé
-
-### Vector Search
-
-- ✅ Recherche sémantique sur documentation (~70% pertinence)
-- ✅ Recherche cross-repo (trouve dans front, bff, glossaire...)
-- ⚠️ Recherche sur code : moins pertinent que grep/LSP pour queries exactes
-- ✅ Filtrage par type fonctionne
-- ✅ Performance : ~80ms total (55ms embed + 20ms search)
-
-### RAG
-
-- ✅ Synthèse de réponses basées sur le contexte
-- ✅ Mistral génère des réponses cohérentes en français
-- ✅ Sources citées dans l'output
-- ⚠️ Latence ~3-5s (acceptable)
-
-### Limites observées
-
-1. **Code** : Le vector search est moins efficace sur le code que sur la doc
-   - Les embeddings sont optimisés pour le langage naturel
-   - Le chunking casse la structure du code
-   - Pour le code : préférer grep/LSP
-
-2. **Scores** : 65-75% max même sur des queries pertinentes
-   - C'est normal pour des embeddings locaux
-   - Les résultats restent triés correctement
-
-3. **Duplicatas** : Les worktrees créent des duplicatas dans les résultats
-
-## Ressources utilisées
-
-| Ressource      | Utilisation                      |
-| -------------- | -------------------------------- |
-| RAM (idle)     | ~100MB (PostgreSQL)              |
-| RAM (search)   | ~1.5GB (Ollama charge le modèle) |
-| RAM (RAG)      | ~5GB (Mistral + embedding)       |
-| Disque DB      | ~150MB                           |
-| Disque modèles | ~4.5GB (nomic + mistral)         |
-
-## Procédure de désinstallation
-
-### 1. Arrêter les services
-
-```bash
-brew services stop postgresql@16
-brew services stop ollama
-```
-
-### 2. Supprimer la base de données
-
-```bash
-/opt/homebrew/opt/postgresql@16/bin/dropdb hexa_vectors
-```
-
-### 3. Supprimer les modèles Ollama
-
-```bash
-ollama rm nomic-embed-text
-ollama rm mistral
-```
-
-### 4. Désinstaller les packages (optionnel)
-
-```bash
-# Si tu veux garder PostgreSQL/Ollama pour autre chose, skip cette étape
-brew uninstall ollama
-brew uninstall postgresql@16
-brew uninstall pgvector
-```
-
-### 5. Supprimer les données PostgreSQL (optionnel)
-
-```bash
-rm -rf /opt/homebrew/var/postgresql@16
-```
-
-### 6. Supprimer le projet
-
-```bash
-rm -rf ~/Code/projects/hexa-vector-postgres
-```
-
-### 7. Nettoyer les alias
-
-Éditer `~/.zshrc` et supprimer :
-
-```bash
-# Hexa Vector Search
-alias hexa-search="cd ~/Code/projects/hexa-vector-postgres && npx tsx src/search.ts"
-alias hexa-ingest="cd ~/Code/projects/hexa-vector-postgres && npx tsx src/ingest.ts"
-alias hexa-rag="cd ~/Code/projects/hexa-vector-postgres && npx tsx src/rag.ts"
-```
-
-### 8. Nettoyer le PATH (si modifié)
-
-Supprimer de `~/.zshrc` :
-
-```bash
-export PATH="$HOME/Hexactitude/bin/hexa-vector:$PATH"
-```
-
-Puis :
-
-```bash
-rm -rf ~/Hexactitude/bin/hexa-vector
-```
-
-## Structure du projet
-
-```
-~/Code/projects/hexa-vector-postgres/
-├── src/
-│   ├── config.ts      # Sources à indexer
-│   ├── scanner.ts     # Trouve les fichiers
-│   ├── chunker.ts     # Découpe en segments (~500 tokens)
-│   ├── embedder.ts    # Appelle Ollama nomic-embed-text
-│   ├── db.ts          # PostgreSQL + pgvector
-│   ├── ingest.ts      # CLI ingestion
-│   ├── search.ts      # CLI recherche
-│   └── rag.ts         # CLI RAG (search + Mistral)
-├── package.json
-├── tsconfig.json
-├── PLAN.md            # Plan initial
-└── README.md          # Cette doc
-```
-
-## Maintenance
-
-### Réindexer après modifications
-
-```bash
-hexa-ingest --incremental
-```
-
-### Vérifier l'état
-
-```bash
-hexa-search --stats
-brew services list | grep -E "postgresql|ollama"
-```
-
-### Logs d'ingestion
-
-```bash
-tail -f ~/Code/projects/hexa-vector-postgres/ingest.log
-```
+MIT

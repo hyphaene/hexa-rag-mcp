@@ -1,8 +1,4 @@
-import {
-  OLLAMA_CONFIG,
-  type EmbeddingModel,
-  getEmbeddingModel,
-} from "./config.js";
+import { getConfig, type EmbeddingModel, getEmbeddingModel } from "./config.js";
 
 export interface EmbeddingResult {
   embedding: number[];
@@ -31,7 +27,8 @@ export function getModel(): EmbeddingModel {
  * Get embedding from Ollama for a single text.
  */
 export async function getEmbedding(text: string): Promise<number[]> {
-  const response = await fetch(`${OLLAMA_CONFIG.host}/api/embeddings`, {
+  const config = getConfig();
+  const response = await fetch(`${config.ollama.host}/api/embeddings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -81,7 +78,8 @@ export async function getEmbeddings(
  */
 export async function checkOllama(): Promise<boolean> {
   try {
-    const response = await fetch(`${OLLAMA_CONFIG.host}/api/tags`);
+    const config = getConfig();
+    const response = await fetch(`${config.ollama.host}/api/tags`);
     if (!response.ok) return false;
 
     const data = (await response.json()) as {

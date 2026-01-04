@@ -1,35 +1,39 @@
-export interface SourceConfig {
-    name: string;
-    type: "knowledge" | "script" | "plugin" | "glossary" | "code" | "contract" | "doc";
-    basePath: string;
-    patterns: string[];
-    exclude: string[];
-}
-export declare const SOURCES: SourceConfig[];
+/**
+ * Re-export config from new schema for backward compatibility
+ * This file bridges old imports to the new config system
+ */
+export { type SourceConfig, type DatabaseConfig, type OllamaConfig, type ModelsConfig, type ChunkingConfig, type HexaVectorConfig, type EmbeddingModel, EMBEDDING_MODELS, LLM_MODELS, DEFAULT_CONFIG, CONFIG_TEMPLATE, loadConfig, getConfig, getConfigPath, resetConfig, getEmbeddingModel, getLLMModel, getRerankerModel, expandPath, getGlobalConfigDir, getGlobalConfigPath, } from "./config-schema.js";
+import { type SourceConfig } from "./config-schema.js";
+/**
+ * @deprecated Use getConfig().database instead
+ */
+export declare function getDbConfig(): import("./config-schema.js").DatabaseConfig;
+/**
+ * @deprecated Use getConfig().ollama instead
+ */
+export declare function getOllamaConfig(): import("./config-schema.js").OllamaConfig;
+/**
+ * @deprecated Use getConfig().sources instead
+ */
+export declare function getSources(): SourceConfig[];
+/**
+ * @deprecated Use getConfig().chunking instead
+ */
+export declare function getChunkConfig(): import("./config-schema.js").ChunkingConfig;
 export declare const DB_CONFIG: {
-    host: string;
-    port: number;
-    database: string;
-    user: string;
+    readonly host: string;
+    readonly port: number;
+    readonly database: string;
+    readonly user: string;
+    readonly password: string | undefined;
 };
-export interface EmbeddingModel {
-    name: string;
-    ollamaModel: string;
-    dimensions: number;
-    multilingual: boolean;
-    maxTokens: number;
-}
-export declare const EMBEDDING_MODELS: Record<string, EmbeddingModel>;
 export declare const OLLAMA_CONFIG: {
-    host: string;
+    readonly host: string;
     model: string;
     dimensions: number;
 };
-/**
- * Get embedding model config by name, defaults to nomic
- */
-export declare function getEmbeddingModel(name?: string): EmbeddingModel;
 export declare const CHUNK_CONFIG: {
-    maxTokens: number;
-    overlap: number;
+    readonly maxTokens: number;
+    readonly overlap: number;
 };
+export declare const SOURCES: SourceConfig[];

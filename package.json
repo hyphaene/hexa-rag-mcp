@@ -1,30 +1,78 @@
 {
-  "name": "hexa-vector-postgres",
-  "version": "1.0.0",
-  "description": "Local vector search for Hexactitude knowledge base",
+  "name": "hexa-vector",
+  "version": "0.1.0",
+  "description": "Semantic search for your codebase and documentation using PostgreSQL + pgvector + Ollama",
   "type": "module",
-  "scripts": {
-    "build": "tsc",
-    "ingest": "tsx src/ingest.ts",
-    "search": "tsx src/search.ts",
-    "rag": "tsx src/search.ts --model bge --rag",
-    "rag:qwen": "tsx src/search.ts --model bge --rag --llm qwen",
-    "rag:deepseek": "tsx src/search.ts --model bge --rag --llm deepseek"
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp-server.d.ts",
+      "import": "./dist/mcp-server.js"
+    }
   },
   "bin": {
-    "hexa-ingest": "./dist/ingest.js",
-    "hexa-search": "./dist/search.js"
+    "hexa-vector": "./dist/cli.js",
+    "hexa-vector-mcp": "./dist/mcp-server.js"
   },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "dev:ingest": "tsx src/ingest.ts",
+    "dev:search": "tsx src/search.ts",
+    "dev:cli": "tsx src/cli.ts"
+  },
+  "keywords": [
+    "vector-search",
+    "semantic-search",
+    "rag",
+    "embeddings",
+    "postgresql",
+    "pgvector",
+    "ollama",
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "codebase-search"
+  ],
+  "author": "Maximilien",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hyphaene/hexa-vector"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.1",
     "glob": "^11.0.0",
     "pg": "^8.13.0",
     "pgvector": "^0.2.0",
-    "ts-morph": "^27.0.2"
+    "ts-morph": "^27.0.2",
+    "zod": "^4.3.5"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
+  },
+  "peerDependencies": {
+    "ollama": ">=0.5.0"
+  },
+  "peerDependenciesMeta": {
+    "ollama": {
+      "optional": true
+    }
   }
 }

@@ -1,9 +1,6 @@
-import { OLLAMA_CONFIG } from "./config.js";
-export const LLM_MODELS = {
-    qwen: "qwen2.5:7b",
-    deepseek: "deepseek-r1:8b",
-};
-let currentLLM = LLM_MODELS.qwen;
+import { getConfig, getLLMModel, LLM_MODELS } from "./config.js";
+export { LLM_MODELS };
+let currentLLM = null;
 export function setLLM(model) {
     if (!LLM_MODELS[model]) {
         throw new Error(`Unknown LLM: ${model}. Available: ${Object.keys(LLM_MODELS).join(", ")}`);
@@ -11,7 +8,7 @@ export function setLLM(model) {
     currentLLM = LLM_MODELS[model];
 }
 export function getLLM() {
-    return currentLLM;
+    return currentLLM || getLLMModel();
 }
 /**
  * Generate a response using retrieved contexts.
@@ -42,11 +39,12 @@ ${contextBlock}
 ${query}
 
 ## Réponse`;
-    const response = await fetch(`${OLLAMA_CONFIG.host}/api/generate`, {
+    const config = getConfig();
+    const response = await fetch(`${config.ollama.host}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            model: currentLLM,
+            model: getLLM(),
             prompt,
             stream: false,
             options: {
@@ -66,11 +64,13 @@ ${query}
  */
 export async function checkGenerator() {
     try {
-        const response = await fetch(`${OLLAMA_CONFIG.host}/api/tags`);
+        const config = getConfig();
+        const llm = getLLM();
+        const response = await fetch(`${config.ollama.host}/api/tags`);
         if (!response.ok)
             return false;
         const data = (await response.json());
-        return (data.models?.some((m) => m.name === currentLLM || m.name.startsWith(currentLLM.split(":")[0])) ?? false);
+        return (data.models?.some((m) => m.name === llm || m.name.startsWith(llm.split(":")[0])) ?? false);
     }
     catch {
         return false;

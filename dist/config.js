@@ -1,110 +1,78 @@
-import { homedir } from "os";
-import { join } from "path";
-const HOME = homedir();
-export const SOURCES = [
-    // Groupe 1: Hexactitude
-    {
-        name: "hexactitude-docs",
-        type: "knowledge",
-        basePath: join(HOME, "Hexactitude"),
-        patterns: ["**/*.md"],
-        exclude: [
-            "**/gitignored/**",
-            "**/node_modules/**",
-            "**/cache/**",
-            "**/.git/**",
-        ],
-    },
-    {
-        name: "hexactitude-scripts",
-        type: "script",
-        basePath: join(HOME, "Hexactitude/claude/scripts"),
-        patterns: ["**/*.sh"],
-        exclude: [],
-    },
-    {
-        name: "hexactitude-plugins",
-        type: "plugin",
-        basePath: join(HOME, "Hexactitude/claude/marketplace/plugins"),
-        patterns: ["**/*.md", "**/*.ts", "**/manifest.json"],
-        exclude: ["**/node_modules/**"],
-    },
-    // Groupe 2: Documentation métier
-    {
-        name: "ahs-documentation",
-        type: "glossary",
-        basePath: join(HOME, "Adeo/ahs-documentation"),
-        patterns: ["**/*.md"],
-        exclude: ["**/node_modules/**"],
-    },
-    // Groupe 3: Code source
-    {
-        name: "front",
-        type: "code",
-        basePath: join(HOME, "Adeo/projects/execution/ahs-operator-execution-frontend/src"),
-        patterns: ["**/*.ts", "**/*.vue"],
-        exclude: ["**/*.spec.ts", "**/*.test.ts", "**/node_modules/**"],
-    },
-    {
-        name: "bff",
-        type: "code",
-        basePath: join(HOME, "Adeo/projects/execution/ahs-operator-execution-bff/src"),
-        patterns: ["**/*.ts"],
-        exclude: ["**/*.spec.ts", "**/*.test.ts", "**/node_modules/**"],
-    },
-    {
-        name: "contracts",
-        type: "contract",
-        basePath: join(HOME, "Adeo/projects/execution/_packages/ahs-operator-execution-contracts/src"),
-        patterns: ["**/*.ts"],
-        exclude: ["**/node_modules/**"],
-    },
-];
+/**
+ * Re-export config from new schema for backward compatibility
+ * This file bridges old imports to the new config system
+ */
+export { EMBEDDING_MODELS, LLM_MODELS, DEFAULT_CONFIG, CONFIG_TEMPLATE, loadConfig, getConfig, getConfigPath, resetConfig, getEmbeddingModel, getLLMModel, getRerankerModel, expandPath, getGlobalConfigDir, getGlobalConfigPath, } from "./config-schema.js";
+// Legacy exports for backward compatibility
+import { getConfig } from "./config-schema.js";
+/**
+ * @deprecated Use getConfig().database instead
+ */
+export function getDbConfig() {
+    return getConfig().database;
+}
+/**
+ * @deprecated Use getConfig().ollama instead
+ */
+export function getOllamaConfig() {
+    return getConfig().ollama;
+}
+/**
+ * @deprecated Use getConfig().sources instead
+ */
+export function getSources() {
+    return getConfig().sources;
+}
+/**
+ * @deprecated Use getConfig().chunking instead
+ */
+export function getChunkConfig() {
+    return getConfig().chunking;
+}
+// Legacy constants (now dynamic from config)
 export const DB_CONFIG = {
-    host: "localhost",
-    port: 5432,
-    database: "hexa_vectors",
-    user: process.env.USER || "maximilien",
-};
-export const EMBEDDING_MODELS = {
-    nomic: {
-        name: "nomic",
-        ollamaModel: "nomic-embed-text",
-        dimensions: 768,
-        multilingual: false,
-        maxTokens: 500, // nomic supports 8192 context
+    get host() {
+        return getConfig().database.host;
     },
-    e5: {
-        name: "e5",
-        ollamaModel: "jeffh/intfloat-multilingual-e5-large:f16",
-        dimensions: 1024,
-        multilingual: true,
-        maxTokens: 300, // e5 has 512 context limit - aggressive margin
+    get port() {
+        return getConfig().database.port;
     },
-    bge: {
-        name: "bge",
-        ollamaModel: "bge-m3",
-        dimensions: 1024,
-        multilingual: true,
-        maxTokens: 800, // bge-m3 supports 8192 context - larger chunks for better context
+    get database() {
+        return getConfig().database.database;
+    },
+    get user() {
+        return getConfig().database.user;
+    },
+    get password() {
+        return getConfig().database.password;
     },
 };
 export const OLLAMA_CONFIG = {
-    host: "http://localhost:11434",
-    // Default model - can be overridden via CLI
-    model: "nomic-embed-text",
+    get host() {
+        return getConfig().ollama.host;
+    },
+    model: "nomic-embed-text", // legacy default
     dimensions: 768,
 };
-/**
- * Get embedding model config by name, defaults to nomic
- */
-export function getEmbeddingModel(name) {
-    if (name && EMBEDDING_MODELS[name]) {
-        return EMBEDDING_MODELS[name];
-    }
-    return EMBEDDING_MODELS.nomic;
-}
 export const CHUNK_CONFIG = {
-    maxTokens: 500,
-    overlap: 50, // tokens de chevauchement entre chunks
+    get maxTokens() {
+        return getConfig().chunking.maxTokens;
+    },
+    get overlap() {
+        return getConfig().chunking.overlap;
+    },
 };
+export const SOURCES = new Proxy([], {
+    get(target, prop) {
+        const sources = getConfig().sources;
+        if (prop === "length")
+            return sources.length;
+        if (typeof prop === "string" && !isNaN(Number(prop))) {
+            return sources[Number(prop)];
+        }
+        if (prop === Symbol.iterator) {
+            return sources[Symbol.iterator].bind(sources);
+        }
+        return Reflect.get(sources, prop);
+    },
+});

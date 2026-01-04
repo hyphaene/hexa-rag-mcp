@@ -4,20 +4,21 @@ import { join } from "path";
 import { existsSync } from "fs";
 import { SOURCES } from "./config.js";
 export async function scanSource(source) {
-    if (!existsSync(source.basePath)) {
-        console.warn(`Source path does not exist: ${source.basePath}`);
+    const basePath = source.path;
+    if (!existsSync(basePath)) {
+        console.warn(`Source path does not exist: ${basePath}`);
         return [];
     }
     const files = [];
     for (const pattern of source.patterns) {
         const matches = await glob(pattern, {
-            cwd: source.basePath,
-            ignore: source.exclude,
+            cwd: basePath,
+            ignore: source.exclude || [],
             nodir: true,
             absolute: false,
         });
         for (const match of matches) {
-            const absolutePath = join(source.basePath, match);
+            const absolutePath = join(basePath, match);
             try {
                 const stats = await stat(absolutePath);
                 // Skip files > 100KB

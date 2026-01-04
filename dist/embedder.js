@@ -1,4 +1,4 @@
-import { OLLAMA_CONFIG, getEmbeddingModel, } from "./config.js";
+import { getConfig, getEmbeddingModel } from "./config.js";
 // Current model used for embeddings - can be set via setModel()
 let currentModel = getEmbeddingModel();
 /**
@@ -18,7 +18,8 @@ export function getModel() {
  * Get embedding from Ollama for a single text.
  */
 export async function getEmbedding(text) {
-    const response = await fetch(`${OLLAMA_CONFIG.host}/api/embeddings`, {
+    const config = getConfig();
+    const response = await fetch(`${config.ollama.host}/api/embeddings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -58,7 +59,8 @@ export async function getEmbeddings(texts, onProgress) {
  */
 export async function checkOllama() {
     try {
-        const response = await fetch(`${OLLAMA_CONFIG.host}/api/tags`);
+        const config = getConfig();
+        const response = await fetch(`${config.ollama.host}/api/tags`);
         if (!response.ok)
             return false;
         const data = (await response.json());
