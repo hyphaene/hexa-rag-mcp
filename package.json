@@ -1,7 +1,7 @@
 {
-  "name": "hexa-vector",
+  "name": "@hyphaene/hexa-rag-mcp",
   "version": "0.1.0",
-  "description": "Semantic search for your codebase and documentation using PostgreSQL + pgvector + Ollama",
+  "description": "Semantic search MCP server for your codebase using PostgreSQL + pgvector + Ollama",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -16,8 +16,8 @@
     }
   },
   "bin": {
-    "hexa-vector": "./dist/cli.js",
-    "hexa-vector-mcp": "./dist/mcp-server.js"
+    "hexa-rag-mcp": "./dist/cli.js",
+    "hexa-rag-mcp-server": "./dist/mcp-server.js"
   },
   "scripts": {
     "build": "tsc",
@@ -43,7 +43,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hyphaene/hexa-vector"
+    "url": "https://github.com/hyphaene/hexa-rag-mcp"
   },
   "engines": {
     "node": ">=18.0.0"
