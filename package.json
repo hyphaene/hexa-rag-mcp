@@ -24,7 +24,10 @@
     "prepublishOnly": "npm run build",
     "dev:ingest": "tsx src/ingest.ts",
     "dev:search": "tsx src/search.ts",
-    "dev:cli": "tsx src/cli.ts"
+    "dev:cli": "tsx src/cli.ts",
+    "repo": "open https://github.com/hyphaene/hexa-rag-mcp",
+    "repo:ci": "open https://github.com/hyphaene/hexa-rag-mcp/actions",
+    "repo:prs": "open https://github.com/hyphaene/hexa-rag-mcp/pulls"
   },
   "keywords": [
     "vector-search",
