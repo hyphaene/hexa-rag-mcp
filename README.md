@@ -1,6 +1,6 @@
-# hexa-vector
+# @hyphaene/hexa-rag-mcp
 
-Semantic search for your codebase and documentation using PostgreSQL + pgvector + Ollama.
+Semantic search MCP server for your codebase using PostgreSQL + pgvector + Ollama.
 
 ## Features
 
@@ -34,53 +34,53 @@ ollama pull qwen2.5:7b       # LLM for RAG
 ## Installation
 
 ```bash
-npm install -g hexa-vector
+npm install -g @hyphaene/hexa-rag-mcp
 ```
 
 Or use npx:
 
 ```bash
-npx hexa-vector init
+npx @hyphaene/hexa-rag-mcp init
 ```
 
 ## Quick Start
 
 ```bash
 # 1. Create global config (one-time setup)
-hexa-vector init --global
+hexa-rag-mcp init --global
 
-# 2. Edit ~/.config/hexa-vector/config.json to add your sources
+# 2. Edit ~/.config/hexa-rag-mcp/config.json to add your sources
 
 # 3. Check system requirements
-hexa-vector doctor
+hexa-rag-mcp doctor
 
 # 4. Index your files
-hexa-vector ingest
+hexa-rag-mcp ingest
 
 # 5. Search!
-hexa-vector search "how does authentication work"
+hexa-rag-mcp search "how does authentication work"
 
 # 6. Or get a synthesized answer
-hexa-vector search "what is the login flow" --rag
+hexa-rag-mcp search "what is the login flow" --rag
 ```
 
 ## Configuration
 
 ### Config file locations
 
-hexa-vector looks for config in this order:
+hexa-rag-mcp looks for config in this order:
 
 1. `--config <path>` - Explicit path (highest priority)
-2. `./hexa-vector.config.json` - Project config (walks up directories)
-3. `~/.config/hexa-vector/config.json` - Global config (fallback)
+2. `./hexa-rag-mcp.config.json` - Project config (walks up directories)
+3. `~/.config/hexa-rag-mcp/config.json` - Global config (fallback)
 
 ### Global config (recommended)
 
 For personal use, create a global config once:
 
 ```bash
-hexa-vector init --global           # Creates ~/.config/hexa-vector/config.json
-hexa-vector init --global -i        # Interactive wizard
+hexa-rag-mcp init --global           # Creates ~/.config/hexa-rag-mcp/config.json
+hexa-rag-mcp init --global -i        # Interactive wizard
 ```
 
 ### Project config
@@ -148,61 +148,61 @@ For project-specific settings, create a local config:
 
 ## CLI Commands
 
-### `hexa-vector init`
+### `hexa-rag-mcp init`
 
 Create a new config file.
 
 ```bash
-hexa-vector init                    # Project config (./hexa-vector.config.json)
-hexa-vector init --global           # Global config (~/.config/hexa-vector/config.json)
-hexa-vector init -g -i              # Global + interactive wizard
+hexa-rag-mcp init                    # Project config (./hexa-rag-mcp.config.json)
+hexa-rag-mcp init --global           # Global config (~/.config/hexa-rag-mcp/config.json)
+hexa-rag-mcp init -g -i              # Global + interactive wizard
 ```
 
-### `hexa-vector doctor`
+### `hexa-rag-mcp doctor`
 
 Check system requirements (PostgreSQL, Ollama, models).
 
 ```bash
-hexa-vector doctor
+hexa-rag-mcp doctor
 ```
 
-### `hexa-vector ingest`
+### `hexa-rag-mcp ingest`
 
 Index files from configured sources.
 
 ```bash
-hexa-vector ingest                  # All sources
-hexa-vector ingest -s docs          # Specific source
+hexa-rag-mcp ingest                  # All sources
+hexa-rag-mcp ingest -s docs          # Specific source
 ```
 
-### `hexa-vector search`
+### `hexa-rag-mcp search`
 
 Search the knowledge base.
 
 ```bash
-hexa-vector search "query"
-hexa-vector search "query" --limit 20
-hexa-vector search "query" --type code
-hexa-vector search "query" --hybrid          # Vector + BM25
-hexa-vector search "query" --rerank          # Cross-encoder reranking
-hexa-vector search "query" --rag             # Generate answer
-hexa-vector search "query" --rag --llm deepseek
+hexa-rag-mcp search "query"
+hexa-rag-mcp search "query" --limit 20
+hexa-rag-mcp search "query" --type code
+hexa-rag-mcp search "query" --hybrid          # Vector + BM25
+hexa-rag-mcp search "query" --rerank          # Cross-encoder reranking
+hexa-rag-mcp search "query" --rag             # Generate answer
+hexa-rag-mcp search "query" --rag --llm deepseek
 ```
 
-### `hexa-vector serve`
+### `hexa-rag-mcp serve`
 
 Start MCP server for Claude Code integration.
 
 ```bash
-hexa-vector serve
+hexa-rag-mcp serve
 ```
 
-### `hexa-vector stats`
+### `hexa-rag-mcp stats`
 
 Show database statistics.
 
 ```bash
-hexa-vector stats
+hexa-rag-mcp stats
 ```
 
 ## MCP Integration
@@ -212,9 +212,27 @@ Add to your Claude Code settings (`~/.claude/settings.json`):
 ```json
 {
   "mcpServers": {
-    "hexa-vector": {
-      "command": "hexa-vector-mcp",
-      "args": []
+    "hexa-rag": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "-p",
+        "@hyphaene/hexa-rag-mcp@latest",
+        "-c",
+        "hexa-rag-mcp-server"
+      ]
+    }
+  }
+}
+```
+
+Or if installed globally:
+
+```json
+{
+  "mcpServers": {
+    "hexa-rag": {
+      "command": "hexa-rag-mcp-server"
     }
   }
 }
@@ -236,10 +254,10 @@ import {
   getEmbedding,
   searchSimilar,
   generateAnswer,
-} from "hexa-vector";
+} from "@hyphaene/hexa-rag-mcp";
 
 // Load config
-loadConfig("./hexa-vector.config.json");
+loadConfig("./hexa-rag-mcp.config.json");
 
 // Search
 const embedding = await getEmbedding("my query");
