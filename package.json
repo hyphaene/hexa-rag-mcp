@@ -1,6 +1,6 @@
 {
   "name": "@hyphaene/hexa-rag-mcp",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Semantic search MCP server for your codebase using PostgreSQL + pgvector + Ollama",
   "type": "module",
   "main": "./dist/index.js",
